@@ -1,0 +1,8 @@
+transformers>=4.40.0
+datasets>=2.19.0
+peft>=0.10.0
+torch>=2.2.0
+scikit-learn>=1.4.0
+accelerate>=0.29.0
+sacrebleu>=2.4.0
+gradio>=4.0.0
