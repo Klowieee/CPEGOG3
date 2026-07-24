@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/handbooks/*.pdf
+data/processed/*
+data/vector_db/*
+!data/handbooks/.gitkeep
+!data/processed/.gitkeep
+!data/vector_db/.gitkeep
+.pytest_cache/
