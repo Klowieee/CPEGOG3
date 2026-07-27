@@ -43,6 +43,60 @@ Rationale: `part` disambiguates duplicated section titles across parts and colli
 }
 ```
 
+### 1.4 Course / Curriculum (Phase 15 — produced by extraction, consumed by the planner)
+
+The `courses` map is keyed by code and holds the checklist's own order.
+`prereqs`/`coreqs` are tuples of codes (ANDed); `confidence` records whether a
+course's prerequisites were *stated*, merely *inferred from year/term*, or
+*unknown*, so the UI can distinguish "no prerequisites" from "we could not tell".
+
+```yaml
+program_id: bscs-st
+terms_per_year: 3
+prereq_source: column          # column | year_term | none
+max_units_override: null       # §10.2 defers to the checklist's own cap
+courses:
+  CSMATH2:
+    title: Discrete Structures
+    units: 3
+    year: 1
+    term: 2
+    prereqs: [GEMATMW]
+    coreqs: []
+    prereq_confidence: stated
+    taken: false
+    grade: "0.0"               # informational; `taken` is what planning uses
+    placeholder: false
+```
+
+Rationale: `prereq_source` is a first-class field because extraction cannot know
+in advance whether a checklist states prerequisites, and the planner must behave
+differently — and *say* differently — in each of the three cases
+(`course_planner.md` §4.1). `grade` is kept separate from `taken` so a failed
+course is visible without being credited.
+
+### 1.5 Bundle / PlannedTerm / StudyPlan (returned by the planner)
+
+`Bundle` is one or more courses that must share a term (§10.10.1), so the packer
+has exactly one kind of thing to place; ordinary courses are one-element bundles.
+`StudyPlan` carries `terms` **plus everything it could not schedule** —
+`available_now`, `deferred`, `blocked`, `unreachable`, `cycles`, `notes`. Nothing
+is silently omitted, and `build_plan` never raises for a data reason: every
+problem becomes an entry, mirroring `Answer(error=...)`.
+
+### 1.6 PolicyRule (returned by policy grounding, rendered beside every constraint)
+
+`{key, statement, value, citation, similarity, excerpt}`. `value` is the number
+actually applied (from config); `citation` is a real `RetrievedChunk.citation`, or
+`None` when retrieval fell below the floor — in which case the number still
+applies but the claim of grounding is visibly withdrawn.
+
+### 1.7 CoursePlan (returned by the core, rendered by the terminal)
+
+`{plan: StudyPlan, policy: list[PolicyRule], curriculum: Curriculum, error}` —
+the planning counterpart to `Answer`, and the second UI-agnostic seam a future
+GUI would call (AC-4).
+
 ## 2. Module Specifications
 
 ### 2.1 `src/ingestion`
@@ -74,10 +128,19 @@ Rationale: `part` disambiguates duplicated section titles across parts and colli
 
 ### 2.7 `src/chat`
 - `answer_question(question) -> Answer` — the composition core: retrieve → (refuse if below floor) → build prompt → generate → (rewrite rescue if the model refused) → attach citations.
+- `plan_courses(curriculum, taken) -> CoursePlan` — the second core entry point (Phase 15): retrieves the policy citations, runs the planner, returns everything the UI needs. **Makes no LLM call** (AD-7).
 - `QueryRewriter.rewrite(question) -> list[str]` (`src/chat/rewriter.py`) — one small LLM call turning a casual question into handbook wording. Never raises: a failed rewrite degrades to the behavior without it.
-- Terminal loop: banner (name + handbook edition per OI-2), prompt for input, render answer then citations, `exit`/`quit` commands, graceful Ctrl-C.
+- Terminal loop: banner (name + handbook edition per OI-2), prompt for input, render answer then citations, `exit`/`quit` commands, graceful Ctrl-C. Reserved commands `/plan` and `/help` are dispatched before the question path — explicit dispatch rather than intent classification, because an LLM classifier would cost a call per question and would misroute *"what are the prerequisites for CSOPESY?"*, which is a handbook question.
+- `plan_view.py` — every bit of terminal I/O for `/plan` (the multi-step prompting and the `rich` tables), kept out of `core.py` so the core stays UI-agnostic.
 
-### 2.8 `src/utils`
+### 2.8 `src/curriculum` (Phase 15)
+- `checklist_parser.parse_checklist(pdf) -> (Curriculum, ExtractionReport)` — three extraction tiers with column-role voting; see course_planner.md §3.
+- `model.write_curriculum_yaml(...) / load_curriculum_yaml(path) -> Curriculum` — the hand-editable artifact (AD-8). Writing refuses to overwrite without `force`; loading validates loudly, except that a prerequisite naming an off-checklist course is a warning with the edge dropped.
+- `planner.build_plan(curriculum, taken, *, max_units, min_units, max_terms, pair_labs) -> StudyPlan` — iterative Tarjan cycle detection and deterministic breaking, `graphlib` levelling, corequisite bundling, greedy unit-capped packing under a total tie-break order.
+- `policy.load_policy(retriever, planner) -> list[PolicyRule]` — four fixed retrievals against the existing index; zero LLM calls.
+- `mermaid.render_plan_markdown(...) / write_plan_markdown(...)` — the flowchart artifact.
+
+### 2.9 `src/utils`
 - Config loader (validated dataclass), logging setup, token counting helper.
 
 ## 3. Online Query Sequence
@@ -148,6 +211,12 @@ retrieval, but it is not the mechanism that carries this feature.
 | Ingestion run twice | Idempotent: collection is rebuilt, not duplicated |
 | Query rewrite call fails | Returns no queries; the original refusal stands. The rescue is best-effort and never breaks answering |
 | Rewrite retrieves nothing new | Second answer call is skipped — re-prompting with identical excerpts would only burn quota |
+| Checklist unparseable (Phase 15) | Write the curriculum artifact anyway, with warnings and empty `prereqs:` fields, and tell the user which fields to fill in. A form to complete beats a traceback, and beats a fabricated plan |
+| Curriculum artifact already exists | Refuse to overwrite without `--force`. Clobbering hand corrections is the one unforgivable failure for this artifact (AD-8) |
+| Curriculum YAML invalid | `CurriculumError` naming the file and the offending course; printed in red, the REPL loop survives |
+| Cyclic prerequisites | Report every cycle, break it using the checklist's term order, schedule both courses, and flag it. Refusing to plan would turn a one-cell extraction error into total failure |
+| Corequisite bundle exceeds the unit cap | Listed as `unreachable` with a note — never dropped, and never allowed to spin the packing loop |
+| Vector index stale/missing during `/plan` | The plan is still produced with its configured numbers; each affected constraint reports that the handbook citation was unavailable, rather than implying grounding it does not have |
 
 ## 5. Configuration (settings.yaml sketch)
 
@@ -176,7 +245,22 @@ llm:
   model: llama-3.1-8b-instant
   temperature: 0.1
   max_tokens: 700
+planner:                    # Phase 15; optional section, these are the defaults
+  max_units: 15             # Undergraduate §10.2
+  min_units: 12             # Undergraduate §10.1 — warns only, never overfills
+  max_terms: 8              # packing-loop safety stop and flowchart horizon
+  pair_labs: true           # §10.10.1 lab/lecture inference
+  checklist_dir: data/checklists
+  plan_dir: data/plans
+  mermaid_direction: LR
+  include_taken: true
 ```
+
+The `planner` numbers are constants of this handbook edition rather than invented
+policy, and `src/curriculum/policy.py` prints the governing provision beside each
+one. A per-program override lives in the curriculum artifact
+(`program.max_units`), not here, because §10.2 defers to "the number of units
+indicated on the program checklist" — see course_planner.md §6.
 
 ## 6. Measured: why hybrid retrieval ships disabled
 

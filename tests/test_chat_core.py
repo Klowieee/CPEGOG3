@@ -8,6 +8,9 @@ Exercises the full orchestration and both refusal layers with fakes:
   * backend failure -> graceful error answer
   * empty question -> refuse
   * layer-2 refusal + a rewriter -> rewrite, retrieve again, answer
+
+Phase 15 adds the planning seam, whose headline property is what it does NOT
+do: plan_courses must never touch the backend (AD-7).
 """
 
 import sys
@@ -16,9 +19,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.chat.core import ChatEngine                        # noqa: E402
+from src.curriculum.model import (                          # noqa: E402
+    Course,
+    Curriculum,
+    PrereqConfidence,
+    PrereqSource,
+)
+from src.curriculum.policy import POLICY_QUERIES            # noqa: E402
 from src.llm.backend import LLMBackend, LLMError            # noqa: E402
 from src.prompts.builder import REFUSAL_SENTINEL            # noqa: E402
 from src.retrieval.vector_store import RetrievedChunk       # noqa: E402
+from src.utils.config import PlannerSettings                # noqa: E402
 
 REFUSAL = "Not covered by the handbook."
 
@@ -245,3 +256,74 @@ def test_below_floor_without_rescue_still_refuses_without_backend():
     ans = engine.answer_question("something obscure")
     assert ans.refused
     assert backend.called is False
+
+
+# --- Course planning (Phase 15) --------------------------------------------
+
+def _curriculum():
+    passed = Course("GEMATMW", "Mathematics in the Modern World", 3, 1, 1,
+                    (), (), PrereqConfidence.STATED, True, "3.5")
+    next_up = Course("CSMATH2", "Discrete Structures", 3, 1, 2,
+                     ("GEMATMW",), (), PrereqConfidence.STATED)
+    return Curriculum("bscs-st", "BS Computer Science", 3,
+                      {c.code: c for c in (passed, next_up)},
+                      PrereqSource.COLUMN)
+
+
+def test_plan_courses_makes_no_backend_call():
+    """Architectural Decision AD-7, in its enforceable form.
+
+    Course ordering is deterministic code; the LLM is not in the loop. A plan
+    must be reproducible and must cost nothing, so this sits deliberately
+    beside test_below_floor_refuses_without_calling_backend above.
+    """
+    backend = FakeBackend(reply="should not be used")
+    engine = ChatEngine(FakeRetriever([make_chunk(0.8)]), backend, REFUSAL)
+
+    engine.plan_courses(_curriculum())
+
+    assert backend.called is False
+
+
+def test_plan_courses_returns_plan_and_policy():
+    retriever = FakeRetriever([make_chunk(0.8)])
+    engine = ChatEngine(retriever, FakeBackend(), REFUSAL)
+
+    result = engine.plan_courses(_curriculum())
+
+    assert [c.code for c in result.plan.terms[0].courses] == ["CSMATH2"]
+    assert result.error is None
+    # One retrieval per policy rule, and every rule carries the number applied.
+    assert len(result.policy) == len(POLICY_QUERIES)
+    assert any(r.key == "max_units" and r.value == 15.0 for r in result.policy)
+
+
+def test_plan_courses_honors_the_configured_limits():
+    """The engine must pass PlannerSettings through, not hard-code 15."""
+    courses = [Course(f"AAA{i:03d}", f"Course {i}", 3) for i in range(4)]
+    curriculum = Curriculum("x", "X", 3, {c.code: c for c in courses},
+                            PrereqSource.COLUMN)
+    engine = ChatEngine(FakeRetriever([make_chunk(0.8)]), FakeBackend(), REFUSAL,
+                        planner=PlannerSettings(max_units=6.0, min_units=0.0))
+
+    result = engine.plan_courses(curriculum)
+
+    assert result.plan.terms[0].units == 6.0
+
+
+def test_plan_courses_accepts_extra_taken_codes():
+    engine = ChatEngine(FakeRetriever([make_chunk(0.8)]), FakeBackend(), REFUSAL)
+
+    result = engine.plan_courses(_curriculum(), {"CSMATH2"})
+
+    assert result.plan.terms == []
+
+
+def test_plan_courses_on_empty_curriculum_returns_an_empty_plan():
+    empty = Curriculum("x", "X", 3, {}, PrereqSource.NONE)
+    engine = ChatEngine(FakeRetriever([make_chunk(0.8)]), FakeBackend(), REFUSAL)
+
+    result = engine.plan_courses(empty)
+
+    assert result.plan.terms == []
+    assert result.error is None

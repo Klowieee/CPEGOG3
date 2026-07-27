@@ -24,15 +24,21 @@ Flow (docs/system_design.md §3):
                 refuse questions the handbook covers)
              -> else: answer + resolved citations.
 
+Also provides plan_courses(curriculum, taken) -> CoursePlan, the Phase 15
+counterpart: same UI-agnostic contract, but it makes NO LLM call at all
+(Architectural Decision AD-7 — see docs/course_planner.md §5).
+
 Inputs:
-    A question string; a ChatEngine holding the retriever, backend, and
-    refusal message.
+    A question string, or a Curriculum plus the set of passed course codes; a
+    ChatEngine holding the retriever, backend, refusal message, and the
+    course-planning limits.
 
 Outputs:
-    Answer(text, citations, refused).
+    Answer(text, citations, refused), or CoursePlan(plan, policy, curriculum).
 
 Dependencies:
-    src.retrieval.retriever, src.llm.backend, src.prompts.builder.
+    src.retrieval.retriever, src.llm.backend, src.prompts.builder,
+    src.curriculum.planner, src.curriculum.policy.
 
 Why this file exists:
     Keeping orchestration in one place (separate from the terminal I/O) is
@@ -46,6 +52,9 @@ import logging
 from dataclasses import dataclass
 
 from src.chat.rewriter import QueryRewriter
+from src.curriculum.model import Curriculum, StudyPlan
+from src.curriculum.planner import build_plan, resolve_taken
+from src.curriculum.policy import PolicyRule, load_policy
 from src.llm.backend import LLMBackend, LLMError
 from src.prompts.builder import (
     Citation,
@@ -55,6 +64,7 @@ from src.prompts.builder import (
 )
 from src.retrieval.retriever import Retriever, best_similarity
 from src.retrieval.vector_store import RetrievedChunk
+from src.utils.config import PlannerSettings
 
 log = logging.getLogger(__name__)
 
@@ -73,25 +83,49 @@ class Answer:
     unverified: bool = False
 
 
+@dataclass
+class CoursePlan:
+    """A study plan plus the handbook rules that shaped it.
+
+    The planning counterpart to Answer: one object carrying everything a UI
+    needs to render, including the caveats. `error` is set when the curriculum
+    could not be planned at all — the same convention as Answer.error.
+    """
+
+    plan: StudyPlan
+    policy: list[PolicyRule]
+    curriculum: Curriculum
+    # The codes actually treated as passed — the artifact's own flags plus
+    # whatever the caller supplied. Carried so the UI reports the same figure
+    # the planner used; deriving it separately is how a plan and its own header
+    # end up disagreeing.
+    taken: frozenset[str] = frozenset()
+    error: str | None = None
+
+
 class ChatEngine:
     """Holds the wired components and answers questions."""
 
     def __init__(self, retriever: Retriever, backend: LLMBackend,
                  refusal_message: str,
                  rewriter: QueryRewriter | None = None,
-                 rescue_margin: float = 0.05):
+                 rescue_margin: float = 0.05,
+                 planner: PlannerSettings = PlannerSettings()):
         """
         Args:
             rewriter: Optional. When set, a weak retrieval gets one rewrite
                 attempt before the floor decides. None restores the original
                 retrieve-or-refuse behavior exactly.
             rescue_margin: How far above the floor still counts as weak.
+            planner: Course-planning limits. A frozen dataclass, so the default
+                instance is safe to share (same pattern as RewriteSettings).
         """
         self.retriever = retriever
         self.backend = backend
         self.refusal_message = refusal_message
         self.rewriter = rewriter
         self.rescue_margin = rescue_margin
+        self.planner = planner
 
     def answer_question(self, question: str) -> Answer:
         """Answer a single question, or refuse, per the two-layer policy."""
@@ -146,6 +180,38 @@ class ChatEngine:
                           refused=False, unverified=True)
 
         return Answer(parsed.text, parsed.citations, refused=False)
+
+    def plan_courses(self, curriculum: Curriculum,
+                     taken: set[str] | None = None,
+                     attempted: set[str] | None = None) -> CoursePlan:
+        """Plan the remaining courses in a checklist. Makes NO LLM call.
+
+        The second UI-agnostic entry point alongside answer_question, so a
+        future GUI reuses this unchanged (AC-4). Everything here is local: four
+        retrievals to fetch the handbook provisions that justify each constraint,
+        then pure computation. Architectural Decision AD-7 keeps the model out of
+        it — a schedule must be reproducible, and a confidently wrong schedule is
+        worse than no schedule.
+
+        Never raises for a data reason: build_plan reports cycles and unplannable
+        courses inside the returned plan, and a policy lookup against a stale
+        index degrades to "citation unavailable" rather than failing.
+        """
+        policy = load_policy(self.retriever, self.planner,
+                             term_caps=curriculum.term_caps)
+        plan = build_plan(
+            curriculum, taken or set(),
+            max_units=self.planner.max_units,
+            min_units=self.planner.min_units,
+            max_terms=self.planner.max_terms,
+            pair_labs=self.planner.pair_labs,
+            attempted=attempted,
+        )
+        log.info("Planned %d term(s); %d blocked, %d unreachable, %d cycle(s).",
+                 len(plan.terms), len(plan.blocked), len(plan.unreachable),
+                 len(plan.cycles))
+        return CoursePlan(plan=plan, policy=policy, curriculum=curriculum,
+                          taken=frozenset(resolve_taken(curriculum, taken)))
 
     def _generate(self, question: str, results: list[RetrievedChunk]):
         """Prompt the model with these excerpts and parse the reply.

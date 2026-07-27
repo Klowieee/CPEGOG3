@@ -18,7 +18,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.utils.config import ConfigError, load_settings  # noqa: E402
+from src.utils.config import (  # noqa: E402
+    MERMAID_DIRECTIONS,
+    ConfigError,
+    load_settings,
+)
 
 
 def test_real_settings_file_loads():
@@ -135,3 +139,77 @@ def test_invalid_max_queries_raises(tmp_path):
     p = _variant(tmp_path, "max_queries: 3", "max_queries: 9")
     with pytest.raises(ConfigError, match="max_queries"):
         load_settings(p)
+
+
+# --- Optional planner section (Phase 15) -----------------------------------
+
+def test_real_settings_file_loads_the_planner_section():
+    """The shipped file sets these; the planner must read the handbook's numbers."""
+    p = load_settings().planner
+    assert p.max_units == 15.0        # Undergraduate §10.2
+    assert p.min_units == 12.0        # Undergraduate §10.1
+    assert p.mermaid_direction in MERMAID_DIRECTIONS
+    # Paths are resolved against the project root, like paths.processed_dir.
+    assert p.checklist_dir.is_absolute()
+    assert p.plan_dir.is_absolute()
+
+
+def test_planner_defaults_when_section_absent(tmp_path):
+    """Settings files predating Phase 15 keep working with the same numbers.
+
+    Reuses the truncation trick above: the minimal file it builds stops before
+    the planner block, so this asserts the optional-section default path.
+    """
+    minimal = SETTINGS.read_text(encoding="utf-8")
+    minimal = minimal[:minimal.index("  # Hybrid retrieval")] + """
+llm:
+  base_url: http://x
+  model: m
+  api_key_env: K
+  temperature: 0.1
+  max_output_tokens: 100
+  request_timeout_seconds: 30
+  max_retries: 1
+
+chat:
+  refusal_message: Not in the Handbook.
+"""
+    p = tmp_path / "settings.yaml"
+    p.write_text(minimal, encoding="utf-8")
+
+    s = load_settings(p)
+    assert s.planner.max_units == 15.0
+    assert s.planner.min_units == 12.0
+    assert s.planner.max_terms == 8
+    assert s.planner.pair_labs is True
+    assert s.planner.mermaid_direction == "LR"
+    assert s.planner.include_taken is True
+
+
+def test_min_units_above_max_units_raises(tmp_path):
+    p = _variant(tmp_path, "min_units: 12", "min_units: 20")
+    with pytest.raises(ConfigError, match="min_units"):
+        load_settings(p)
+
+
+def test_invalid_max_units_raises(tmp_path):
+    p = _variant(tmp_path, "max_units: 15", "max_units: 99")
+    with pytest.raises(ConfigError, match="max_units"):
+        load_settings(p)
+
+
+def test_invalid_max_terms_raises(tmp_path):
+    p = _variant(tmp_path, "max_terms: 8", "max_terms: 0")
+    with pytest.raises(ConfigError, match="max_terms"):
+        load_settings(p)
+
+
+def test_invalid_mermaid_direction_raises(tmp_path):
+    p = _variant(tmp_path, "mermaid_direction: LR", "mermaid_direction: sideways")
+    with pytest.raises(ConfigError, match="mermaid_direction"):
+        load_settings(p)
+
+
+def test_mermaid_direction_is_normalized_to_uppercase(tmp_path):
+    p = _variant(tmp_path, "mermaid_direction: LR", "mermaid_direction: tb")
+    assert load_settings(p).planner.mermaid_direction == "TB"

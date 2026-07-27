@@ -73,6 +73,68 @@ Evaluate retrieval quality against the golden set (no LLM needed, Phase 7/11):
 uv run python scripts/eval_retrieval.py
 ```
 
+## Course Planner (Phase 15)
+
+Work out what to enrol in next, and in what order, from your program checklist.
+Ordering is computed from the prerequisite graph in plain code — **no LLM call
+and no API tokens are spent** — while the unit limits it applies are shown with
+real handbook citations retrieved from the local index.
+
+Put your checklist PDF in `data/checklists/`, then inspect what the parser made
+of it before trusting any plan:
+
+```bash
+uv run python scripts/inspect_checklist.py data/checklists/your-checklist.pdf
+```
+
+Its first three lines tell you what it managed to read:
+
+```
+PREREQUISITE SOURCE: column   (45 of 103 course(s) have stated prerequisites)
+YEAR/TERM GROUPING:  found (103 of 103 placed)
+ALREADY TAKEN:       0 course(s) (0 units); 103 remaining (209 units)
+```
+
+It writes `data/checklists/<program>.curriculum.yaml` — a hand-editable file
+listing every course, its units, its prerequisites and corequisites, and whether
+you have passed it. **The planner reads that file, never the PDF**
+(`docs/architecture.md` AD-8), so anything the parser got wrong you fix once, by
+hand, in one place. Re-running the script will not overwrite your corrections
+(pass `--force` if you want it to).
+
+> Most DLSU checklists have no grade column — there is nowhere on the sheet to
+> record what you passed. `/plan` asks you to type those courses, or you can set
+> `taken: true` on them in the curriculum file.
+
+Then, inside the chatbot, type `/plan`. It finds the checklist itself, prints the
+whole program a term at a time, and asks what you have finished:
+
+```
+Which terms have you completed? (1-12; e.g. "1-6" or "1-5,7")
+Terms completed: 1-5
+  ✓ 45 course(s) marked from term(s) 1-5
+
+Anything else you've passed? (codes, or Enter to skip)
+Anything in there you HAVEN'T passed? (e.g. a failed course — codes, or Enter) LOGDSGN
+  ↻ LOGDSGN will be planned again, and anything needing them stays blocked
+```
+
+Whole terms first because that is how progress is actually described; the last
+question is what makes *"I finished terms 1-5 but failed one of them"*
+expressible. A removed course goes back into the plan as a retake, and anything
+depending on it waits.
+
+You then get a term-by-term plan through to graduation — each term capped at the
+load **your checklist** prescribes — plus a Mermaid flowchart at
+`data/plans/<program>-plan.md`. Open it in VS Code or on GitHub to view the
+diagram.
+
+> `data/checklists/` and `data/plans/` are gitignored: the curriculum file
+> contains your grades.
+
+Design rationale, and an honest account of what the planner cannot do, are in
+[`docs/course_planner.md`](docs/course_planner.md).
+
 ## Run Tests
 
 ```bash
@@ -88,9 +150,10 @@ The dependency lists in `pyproject.toml` and `requirements.txt` are kept in sync
 ## Project Structure
 
 See `docs/architecture.md` §3. In short: `src/` holds one package per
-pipeline stage; `scripts/` holds the two entry points; `config/settings.yaml`
-holds every tunable parameter; `data/` holds inputs, intermediate artifacts,
-and the vector store; `docs/` holds all design documentation.
+pipeline stage; `scripts/` holds the entry points and inspection tools;
+`config/settings.yaml` holds every tunable parameter; `data/` holds inputs,
+intermediate artifacts, and the vector store; `docs/` holds all design
+documentation.
 
 ## Implementation Status
 
@@ -110,3 +173,4 @@ and the vector store; `docs/` holds all design documentation.
 | 12 | Final documentation | ✅ Done |
 | 13 | Vague-question query rewriting (rescue on model refusal) | ✅ Done |
 | 14 | Hybrid BM25 retrieval (built, measured, disabled by default) | ✅ Done |
+| 15 | Course planner (checklist → prerequisite flowchart) | ✅ Done |

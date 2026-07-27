@@ -78,6 +78,39 @@ caught them; we corrected them."* That is the methodology, not a weakness.
    refusal (fail-closed). Section numbers are never written by the model — the
    app maps excerpt numbers to citations — so citations can't be invented.
 
+## The course planner: making an unknown input inspectable
+
+The strongest engineering story in the project, because the honest constraint is
+the design driver. A DLSU checklist export's layout is **not ours to control** —
+it varies by program and college, and we could not know in advance whether a
+given sheet even states prerequisites.
+
+Two responses were available. Guess harder at parsing and hope. Or **make the
+unknown inspectable and correctable**: parse once into a hand-editable YAML that
+carries its own warnings and its own column-role decisions, tell the user in
+three lines of `inspect_checklist.py` output which case they are in, and have the
+planner read *that file* and never the PDF (AD-8).
+
+Two related decisions worth defending out loud:
+
+- **The LLM is not in the loop (AD-7).** Ordering courses is a graph problem with
+  an exact answer, so generating one would add risk for nothing — and a
+  confidently wrong schedule is worse than no schedule. `/plan` spends zero
+  tokens. There is a test that asserts the backend is never called.
+- **Numbers from config, citations from retrieval.** The 15-unit cap is a
+  constant of this edition, so it lives in `settings.yaml`; what the retrieval
+  index supplies is *proof the rule exists*, printed beside every constraint. The
+  telling detail is §10.2's actual wording — "15 units, **or the number of units
+  indicated on the program checklist**" — which is genuinely ambiguous, so a
+  config default plus a per-program override models it correctly where an
+  extracted number could not.
+
+And the case that shows the design working: when a checklist has only year/term
+grouping and no prerequisite column, the planner **does not synthesize edges**.
+"Every Y1T1 course precedes every Y1T2 course" would draw a dense, confident,
+wrong graph. Using the term index as the level gives the same ordering with zero
+fabricated claims — and says so on screen.
+
 ## Live demo script (safe order)
 
 1. An answerable discipline question ("Is plagiarism a major offense?") →
@@ -87,9 +120,18 @@ caught them; we corrected them."* That is the methodology, not a weakness.
 3. A not-covered question ("campus wifi password") → show the polite refusal.
 4. `scripts/eval_retrieval.py` → show hit@k on the golden set with no LLM
    involved.
+5. `scripts/inspect_checklist.py <checklist>.pdf` → show the three summary lines
+   (prerequisite source / year-term grouping / already taken) and the written
+   artifact, then open the YAML so the audience sees the escape hatch.
+6. `/plan` in the chatbot → term-by-term table with the §10.2 citation beside the
+   unit cap, then open `data/plans/<program>-plan.md` to show the flowchart.
+   If asked "how do you know it's right?": hand-edit one `prereqs:` line, re-run,
+   and show the plan change.
 
 ## If asked "what would you do next?"
 
 Hybrid retrieval (for exact terms), a local SLM backend (fully offline, and a
 clean local-vs-API experiment), and multi-document expansion — the metadata
-schema already supports it. See docs/future_work.md.
+schema already supports it. For the planner: course-offering awareness, which is
+the difference between a plan that is *permitted* and one that is *possible*.
+See docs/future_work.md.

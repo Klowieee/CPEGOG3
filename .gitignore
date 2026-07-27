@@ -5,7 +5,13 @@ __pycache__/
 data/handbooks/*.pdf
 data/processed/*
 data/vector_db/*
+# Phase 15: a curriculum artifact contains the student's own grades, and a
+# generated plan is derived from it. Neither belongs in version control.
+data/checklists/*
+data/plans/*
 !data/handbooks/.gitkeep
 !data/processed/.gitkeep
 !data/vector_db/.gitkeep
+!data/checklists/.gitkeep
+!data/plans/.gitkeep
 .pytest_cache/

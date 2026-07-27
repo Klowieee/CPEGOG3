@@ -38,6 +38,9 @@ DEFAULT_SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.yaml"
 # Values the OpenAI-compatible `reasoning_effort` parameter accepts.
 REASONING_EFFORTS = {"minimal", "low", "medium", "high", "none"}
 
+# Layout directions Mermaid's `flowchart` accepts.
+MERMAID_DIRECTIONS = {"TB", "TD", "BT", "LR", "RL"}
+
 
 @dataclass(frozen=True)
 class DocumentSettings:
@@ -118,6 +121,29 @@ class ChatSettings:
 
 
 @dataclass(frozen=True)
+class PlannerSettings:
+    """Course planning (Phase 15). Optional section: absent means these
+    defaults, so settings files predating this feature stay valid.
+
+    The unit numbers mirror the handbook rather than inventing policy, and
+    src.curriculum.policy retrieves and prints the governing provision beside
+    every constraint applied. They live here because they are constants of this
+    handbook edition — and because Undergraduate §10.2 defers to "the number of
+    units indicated on the program checklist", a per-program override belongs in
+    the curriculum YAML (program.max_units), not in this file.
+    """
+
+    max_units: float = 15.0        # §10.2 maximum regular-term load
+    min_units: float = 12.0        # §10.1 full-time floor; WARNS only
+    max_terms: int = 8             # safety stop for the packing loop
+    pair_labs: bool = True         # §10.10.1 lab/lecture pairing inference
+    checklist_dir: Path = PROJECT_ROOT / "data" / "checklists"
+    plan_dir: Path = PROJECT_ROOT / "data" / "plans"
+    mermaid_direction: str = "LR"
+    include_taken: bool = True
+
+
+@dataclass(frozen=True)
 class Settings:
     document: DocumentSettings
     paths: PathSettings
@@ -127,6 +153,7 @@ class Settings:
     llm: LLMSettings
     chat: ChatSettings
     rewrite: RewriteSettings = RewriteSettings()
+    planner: PlannerSettings = PlannerSettings()
 
 
 class ConfigError(Exception):
@@ -185,6 +212,7 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_PATH) -> Settings:
     # before these features stay valid.
     hyb = ret.get("hybrid") or {}
     rw = raw.get("rewrite") or {}
+    pl = raw.get("planner") or {}
 
     settings = Settings(
         document=DocumentSettings(
@@ -239,6 +267,16 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_PATH) -> Settings:
             max_output_tokens=int(rw.get("max_output_tokens", 150)),
             max_queries=int(rw.get("max_queries", 3)),
         ),
+        planner=PlannerSettings(
+            max_units=float(pl.get("max_units", 15.0)),
+            min_units=float(pl.get("min_units", 12.0)),
+            max_terms=int(pl.get("max_terms", 8)),
+            pair_labs=bool(pl.get("pair_labs", True)),
+            checklist_dir=PROJECT_ROOT / pl.get("checklist_dir", "data/checklists"),
+            plan_dir=PROJECT_ROOT / pl.get("plan_dir", "data/plans"),
+            mermaid_direction=str(pl.get("mermaid_direction", "LR")).strip().upper(),
+            include_taken=bool(pl.get("include_taken", True)),
+        ),
     )
 
     _validate(settings)
@@ -277,4 +315,23 @@ def _validate(s: Settings) -> None:
         raise ConfigError(
             "llm.reasoning_effort must be one of "
             f"{sorted(REASONING_EFFORTS)} (got '{s.llm.reasoning_effort}')"
+        )
+    p = s.planner
+    if not (1.0 <= p.max_units <= 40.0):
+        raise ConfigError(
+            f"planner.max_units must be between 1 and 40 (got {p.max_units:g})"
+        )
+    if not (0.0 <= p.min_units <= p.max_units):
+        raise ConfigError(
+            "planner.min_units must be between 0 and planner.max_units "
+            f"(got min={p.min_units:g}, max={p.max_units:g})"
+        )
+    if not (1 <= p.max_terms <= 20):
+        raise ConfigError(
+            f"planner.max_terms must be between 1 and 20 (got {p.max_terms})"
+        )
+    if p.mermaid_direction not in MERMAID_DIRECTIONS:
+        raise ConfigError(
+            "planner.mermaid_direction must be one of "
+            f"{sorted(MERMAID_DIRECTIONS)} (got '{p.mermaid_direction}')"
         )
