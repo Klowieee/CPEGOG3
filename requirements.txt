@@ -5,6 +5,9 @@ chromadb>=0.5,<0.6      # Vector store — pinned minor version; API has churned
 openai>=1.30            # OpenAI-compatible client, pointed at the Groq endpoint
 pyyaml>=6.0             # settings.yaml
 rich>=13.0              # Terminal rendering
+rank-bm25>=0.2.2        # Keyword channel for hybrid retrieval (off by default,
+                        # but src/retrieval/retriever.py imports it at module
+                        # level, so the app will not start without it)
 
 # Development
 pytest>=8.0

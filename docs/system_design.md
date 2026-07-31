@@ -138,7 +138,7 @@ GUI would call (AC-4).
 - `model.write_curriculum_yaml(...) / load_curriculum_yaml(path) -> Curriculum` — the hand-editable artifact (AD-8). Writing refuses to overwrite without `force`; loading validates loudly, except that a prerequisite naming an off-checklist course is a warning with the edge dropped.
 - `planner.build_plan(curriculum, taken, *, max_units, min_units, max_terms, pair_labs) -> StudyPlan` — iterative Tarjan cycle detection and deterministic breaking, `graphlib` levelling, corequisite bundling, greedy unit-capped packing under a total tie-break order.
 - `policy.load_policy(retriever, planner) -> list[PolicyRule]` — four fixed retrievals against the existing index; zero LLM calls.
-- `mermaid.render_plan_markdown(...) / write_plan_markdown(...)` — the flowchart artifact.
+- `html_report.render_plan_html(...) / write_plan_html(...)` — the printable plan artifact.
 
 ### 2.9 `src/utils`
 - Config loader (validated dataclass), logging setup, token counting helper.
@@ -252,7 +252,6 @@ planner:                    # Phase 15; optional section, these are the defaults
   pair_labs: true           # §10.10.1 lab/lecture inference
   checklist_dir: data/checklists
   plan_dir: data/plans
-  mermaid_direction: LR
   include_taken: true
 ```
 

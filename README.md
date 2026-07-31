@@ -24,21 +24,42 @@ wording and tries once more before refusing.
 The design rationale and the empirical findings behind these choices are
 consolidated in [`docs/project_narrative.md`](docs/project_narrative.md).
 
-## Setup
+> **Just want to run it?** [`RUNNING.md`](RUNNING.md) is a complete
+> step-by-step guide for both features, from a fresh clone, with troubleshooting.
 
-Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/). `uv` reads the
-dependencies from `pyproject.toml` and manages the virtual environment for you.
+## Setup from a fresh clone
+
+The repository holds **code only**. Every PDF, the vector index, and the
+extracted curriculum are gitignored — the handbook is copyrighted and a
+curriculum file contains a student's grades — so a clone needs the steps below
+before it will answer anything.
+
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+
+**1. Install dependencies.** `uv` reads `pyproject.toml` and creates the venv:
 
 ```bash
+git clone https://github.com/Klowieee/CPEGOG3.git
+cd CPEGOG3
 uv sync                  # creates .venv and installs everything (incl. pytest)
 ```
 
 > The first sync downloads PyTorch (via sentence-transformers, ~2 GB) — run it
 > on good wifi. `uv` caches packages globally, so later syncs are fast.
 
-Place the handbook PDF at `data/handbooks/student-handbook.pdf`.
+**2. Add the handbook PDF** at `data/handbooks/student-handbook.pdf`.
 
-Set your API key (obtain a free key from the provider's console):
+**3. Build the vector index** — one time, a few minutes; it also downloads the
+embedding model (~130 MB) on first run:
+
+```bash
+uv run python scripts/run_ingestion.py
+```
+
+You should end with roughly 369 chunks stored. Everything so far is local.
+
+**4. Set your API key** for answer generation (free key from
+[console.groq.com](https://console.groq.com)):
 
 ```bash
 export GROQ_API_KEY="..."        # Windows (PowerShell): $env:GROQ_API_KEY="..."
@@ -46,6 +67,23 @@ export GROQ_API_KEY="..."        # Windows (PowerShell): $env:GROQ_API_KEY="..."
 
 The key is read from the environment only — never write it into any file in
 this repository. See `.env.example`.
+
+**5. For the course planner only**, add your program checklist PDF to
+`data/checklists/` and extract it once:
+
+```bash
+uv run python scripts/inspect_checklist.py data/checklists/YOUR-CHECKLIST.pdf
+```
+
+Steps 2-4 are for handbook questions; steps 2-3 are skippable if you only want
+`/plan`, which needs neither the handbook index nor an API key.
+
+### Checking it worked
+
+```bash
+uv run pytest                            # ~450 tests, no key or network needed
+uv run python scripts/eval_retrieval.py  # retrieval quality, no LLM involved
+```
 
 ## Usage
 
@@ -125,9 +163,8 @@ expressible. A removed course goes back into the plan as a retake, and anything
 depending on it waits.
 
 You then get a term-by-term plan through to graduation — each term capped at the
-load **your checklist** prescribes — plus a Mermaid flowchart at
-`data/plans/<program>-plan.md`. Open it in VS Code or on GitHub to view the
-diagram.
+load **your checklist** prescribes — plus a printable HTML page at
+`data/plans/<program>-plan.html`. Open it in any browser.
 
 > `data/checklists/` and `data/plans/` are gitignored: the curriculum file
 > contains your grades.
@@ -144,8 +181,17 @@ uv run pytest
 ## Note for pip users
 
 A `requirements.txt` is also provided if you are not using uv:
-`python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`.
-The dependency lists in `pyproject.toml` and `requirements.txt` are kept in sync.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+The dependency lists in `pyproject.toml` and `requirements.txt` are kept in
+sync. Note that `rank-bm25` is not optional despite hybrid retrieval shipping
+disabled: `src/retrieval/retriever.py` imports it at module level, so the app
+will not start without it.
 
 ## Project Structure
 

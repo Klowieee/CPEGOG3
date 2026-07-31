@@ -18,11 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.utils.config import (  # noqa: E402
-    MERMAID_DIRECTIONS,
-    ConfigError,
-    load_settings,
-)
+from src.utils.config import ConfigError, load_settings  # noqa: E402
 
 
 def test_real_settings_file_loads():
@@ -148,7 +144,6 @@ def test_real_settings_file_loads_the_planner_section():
     p = load_settings().planner
     assert p.max_units == 15.0        # Undergraduate §10.2
     assert p.min_units == 12.0        # Undergraduate §10.1
-    assert p.mermaid_direction in MERMAID_DIRECTIONS
     # Paths are resolved against the project root, like paths.processed_dir.
     assert p.checklist_dir.is_absolute()
     assert p.plan_dir.is_absolute()
@@ -182,7 +177,6 @@ chat:
     assert s.planner.min_units == 12.0
     assert s.planner.max_terms == 8
     assert s.planner.pair_labs is True
-    assert s.planner.mermaid_direction == "LR"
     assert s.planner.include_taken is True
 
 
@@ -204,12 +198,3 @@ def test_invalid_max_terms_raises(tmp_path):
         load_settings(p)
 
 
-def test_invalid_mermaid_direction_raises(tmp_path):
-    p = _variant(tmp_path, "mermaid_direction: LR", "mermaid_direction: sideways")
-    with pytest.raises(ConfigError, match="mermaid_direction"):
-        load_settings(p)
-
-
-def test_mermaid_direction_is_normalized_to_uppercase(tmp_path):
-    p = _variant(tmp_path, "mermaid_direction: LR", "mermaid_direction: tb")
-    assert load_settings(p).planner.mermaid_direction == "TB"

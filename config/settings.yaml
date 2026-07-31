@@ -132,9 +132,6 @@ planner:
   # are gitignored: the curriculum artifact contains your grades.
   checklist_dir: data/checklists
   plan_dir: data/plans
-  # Mermaid layout. LR reads as a left-to-right prerequisite chain (matching
-  # docs/rag_pipeline.md); TB stacks terms vertically for long programs.
-  mermaid_direction: LR
-  # Include an "Already taken" subgraph for context. Turn off for large
-  # checklists, where it roughly doubles the node count.
+  # Include an "Already passed" panel in the generated plan for context. Turn
+  # it off to print only the work that remains.
   include_taken: true

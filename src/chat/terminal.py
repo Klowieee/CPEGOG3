@@ -111,7 +111,7 @@ def _render_help(console: Console) -> None:
         "rather than guessing when the handbook does not cover something.\n\n"
         "[bold]/plan[/bold] (or [bold]/flowchart[/bold]) — read your program "
         "checklist and work out what to take next, and in what order. Produces "
-        "a term-by-term plan plus a Mermaid flowchart file. The ordering is "
+        "a term-by-term plan plus a printable HTML page. The ordering is "
         "computed, not generated: no AI model is involved, and the unit limits "
         "it applies are shown with the handbook provision each comes from.\n\n"
         "[bold]/help[/bold] — this. [bold]exit[/bold] — quit.",

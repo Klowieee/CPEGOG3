@@ -6,8 +6,10 @@ Purpose:
     is swappable and a local SLM backend can be added later (AC-1) without
     touching retrieval, prompting, or the chat loop. Ships one implementation:
     APIBackend, an OpenAI-compatible client pointed at the configured endpoint
-    (Gemini's OpenAI-compatibility endpoint by default — see
-    config/settings.yaml and docs/rag_pipeline.md §7).
+    (Groq's OpenAI-compatibility endpoint by default, serving Meta's
+    Llama 3.1 8B Instruct — see config/settings.yaml and
+    docs/rag_pipeline.md §7). Groq is the inference provider, not the model:
+    it serves open-weight models on its own hardware.
 
 Inputs:
     Chat messages (from src.prompts.builder.build_prompt) and LLMSettings.
@@ -21,7 +23,9 @@ Dependencies:
 Why this file exists:
     Isolating the network/provider details behind LLMBackend keeps the rest
     of the system provider-agnostic and testable: the chat core is tested
-    with a fake backend, and swapping Gemini for Groq/OpenAI is a config edit.
+    with a fake backend, and swapping Groq for Gemini/OpenAI — or for a local
+    Ollama server — is a config edit, because every one of them speaks the
+    same OpenAI chat-completions shape.
 """
 
 from __future__ import annotations

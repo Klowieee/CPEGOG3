@@ -52,9 +52,10 @@ exactly. These are asserted, not sampled:
   reloading (`test_written_yaml_is_reloadable_after_a_hand_edit`); if it did not,
   AD-8's "parse once, correct by hand" design would be a fiction. Writing also
   refuses to overwrite an existing artifact without `force`.
-- **Mermaid is structurally valid.** Every node referenced by an edge is
-  declared, IDs contain no space or hyphen, no reserved word is used bare as an
-  ID, and a corequisite pair emits exactly one edge.
+- **The plan page is self-contained and escapes its input.** No `http://`,
+  `<script>`, or `<img>` can appear in the generated HTML — it must work offline
+  and on a printout — and course titles, which come from a PDF outside our
+  control, are HTML-escaped.
 - **No LLM in the planning path.** `test_plan_courses_makes_no_backend_call`
   asserts the backend is never touched — the enforceable form of AD-7.
 

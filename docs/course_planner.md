@@ -301,8 +301,8 @@ three outcomes are first-class:
 from year/term.** "Every Y1T1 course is a prerequisite of every Y1T2 course"
 produces a dense, wrong graph and a diagram with hundreds of meaningless arrows.
 Using the term index directly as the level yields the same correct ordering with
-zero fabricated claims. In case (c) Mermaid still emits — one subgraph, no edges
-— so the extracted node set remains verifiable.
+zero fabricated claims. In case (c) the page still renders — one panel, no
+requirement lines — so the extracted course set remains verifiable.
 
 ## 5. The Planner
 
@@ -468,52 +468,37 @@ resolve for them.
 
 ## 7. Rendering
 
-**Mermaid** (`src/curriculum/mermaid.py`) — one `subgraph` per planned term, plus
-an optional "Already taken" subgraph; solid `-->` for prerequisites, dotted
-`-.->` for corequisites (exactly one edge per pair); four `classDef` styles for
-taken / ready / later / **unknown**, the last dashed and amber so *uncertainty is
-visible rather than hidden*. Written to `data/plans/<program-id>-plan.md` as a
-fenced ```mermaid block inside Markdown, headed with the program, units, and the
-policy citations. A bare `.mmd` would need a Mermaid tool; a `.md` renders in
-VS Code and on GitHub — where this repo's docs are already read — and matches how
-`architecture.md` embeds diagrams.
+**HTML** (`src/curriculum/html_report.py`) — one panel per planned term, each
+course a card carrying its code, units, and requirements; four colour states
+(taken / ready / later / **unknown**, the last dashed and amber so uncertainty
+is *visible* rather than hidden). Written to
+`data/plans/<program-id>-plan.html`.
 
-Two non-obvious requirements, both with tests:
+A node-and-arrow diagram was built first, then replaced — and the reason is
+worth recording. Measured on the real BS CpE checklist, a third-year student's
+plan is **111 nodes and 68 prerequisite edges**. No auto-layout engine turns
+that into anything readable; the arrows cross so heavily they obscure the thing
+the student actually wants, which is *what do I take, and when*. So the fix was
+to stop drawing the graph and lay out the artifact instead: terms as panels,
+and each course's requirements written on its own card as text —
+`needs CALENG2` for a hard prerequisite, `after CALENG1` for a soft one,
+`with LOGDSGN` for a corequisite. Identical information, no crossing lines, and
+it prints.
 
-- **ID sanitization is not optional.** Mermaid IDs reject spaces and hyphens, and
-  bare reserved words (`end`, `graph`, `class`, `subgraph`, `o`, `x`) silently
-  break the parser. `node_id()` uppercases, maps `[^A-Za-z0-9_]` to `_`, and
-  prefixes `C_` **unconditionally** — always prefixing is simpler than
-  conditionally and sidesteps the reserved-word trap entirely.
-- **Every node referenced by an edge must be declared.** This single structural
-  invariant catches most Mermaid syntax errors, and it is what
-  `test_every_node_referenced_by_an_edge_is_declared` checks.
+Three properties the format has to keep, each with a test:
 
-### 7.1 The `/plan` conversation
+- **Self-contained.** No `http://`, `<script>`, `<img>`, or `@import` may appear
+  in the output. The page must work offline, when emailed, and on paper — a
+  study plan that needs a CDN is a study plan that breaks during a demo.
+- **Escaped.** Course titles come from a PDF outside our control, so everything
+  interpolated is `html.escape`d.
+- **Printable.** Term panels avoid page breaks; the "Already passed" list
+  renders as dense chips rather than full cards. That last one is not cosmetic:
+  as cards it cost two extra printed pages and pushed the actual plan off page
+  one. A full 103-course program prints in about six pages.
 
-Four steps, ordered so the one that does the most work comes first:
-
-1. **Find the checklist.** No path is asked for: `_discover_checklists()` looks
-   in `planner.checklist_dir` and prefers a `.curriculum.yaml` over the PDF it
-   came from, because the artifact is the corrected version (AD-8) and
-   re-parsing would discard the user's edits. Only a genuine choice prompts.
-2. **Print the program**, one line per term, codes and units only — the list
-   exists so the student can find the term they finished, and 103 titles would
-   bury that. Non-credit units render bracketed, as the sheet writes them.
-3. **Ask what is done**, in three questions: whole terms (`1-6`, `1-5,7`), then
-   extra courses passed out of sequence, then — the important one — *"anything
-   in there you HAVEN'T passed?"*. A term range alone cannot express "I finished
-   terms 1-5 but failed one of them", which is the common real case; the third
-   question is what makes it sayable. A removed course returns to the plan as a
-   retake, and its dependents wait for it.
-4. **Plan and render.** Every remaining term through to graduation.
-
-One consistency check falls out of step 3. Marking a term complete and then
-removing one course inside it can leave that course's *dependents* still marked
-as passed — a student who "passed" Differential Equations but not Integral
-Calculus. That cannot happen in reality, so `_flag_impossible_history()` says
-which pair disagrees and which half it acted on. It is a note, not a refusal:
-only the student knows which of the two is wrong.
+No JavaScript, deliberately: a plan is a document, not an application, and a
+static file is one less thing that can fail.
 
 **Terminal** (`src/chat/plan_view.py`) — one `rich` table per term with
 `Code | Title | Units | Unlocks`; then deferred, blocked (with the blocking

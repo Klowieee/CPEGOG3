@@ -121,7 +121,7 @@ flowchart TB
 
     subgraph PLAN["Planning (interactive, zero API calls)"]
         P3 --> P4[Planner<br/>cycles, levels, unit-capped packing]
-        P4 --> P5[Mermaid + rich renderers]
+        P4 --> P5[HTML page + rich tables]
         P6[(ChromaDB<br/>handbook index)] -->|policy citations| P5
     end
 ```

@@ -38,9 +38,6 @@ DEFAULT_SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.yaml"
 # Values the OpenAI-compatible `reasoning_effort` parameter accepts.
 REASONING_EFFORTS = {"minimal", "low", "medium", "high", "none"}
 
-# Layout directions Mermaid's `flowchart` accepts.
-MERMAID_DIRECTIONS = {"TB", "TD", "BT", "LR", "RL"}
-
 
 @dataclass(frozen=True)
 class DocumentSettings:
@@ -139,7 +136,6 @@ class PlannerSettings:
     pair_labs: bool = True         # §10.10.1 lab/lecture pairing inference
     checklist_dir: Path = PROJECT_ROOT / "data" / "checklists"
     plan_dir: Path = PROJECT_ROOT / "data" / "plans"
-    mermaid_direction: str = "LR"
     include_taken: bool = True
 
 
@@ -274,7 +270,6 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_PATH) -> Settings:
             pair_labs=bool(pl.get("pair_labs", True)),
             checklist_dir=PROJECT_ROOT / pl.get("checklist_dir", "data/checklists"),
             plan_dir=PROJECT_ROOT / pl.get("plan_dir", "data/plans"),
-            mermaid_direction=str(pl.get("mermaid_direction", "LR")).strip().upper(),
             include_taken=bool(pl.get("include_taken", True)),
         ),
     )
@@ -329,9 +324,4 @@ def _validate(s: Settings) -> None:
     if not (1 <= p.max_terms <= 20):
         raise ConfigError(
             f"planner.max_terms must be between 1 and 20 (got {p.max_terms})"
-        )
-    if p.mermaid_direction not in MERMAID_DIRECTIONS:
-        raise ConfigError(
-            "planner.mermaid_direction must be one of "
-            f"{sorted(MERMAID_DIRECTIONS)} (got '{p.mermaid_direction}')"
         )

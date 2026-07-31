@@ -322,6 +322,11 @@ def _term_label(index: int) -> str:
     return "Next term" if index == 1 else f"Term +{index}"
 
 
+def _units(value: float) -> str:
+    """"1 unit" / "3 units" — these notes are read by a person."""
+    return f"{value:g} unit" + ("" if value == 1 else "s")
+
+
 def resolve_taken(curriculum: Curriculum, extra: set[str] | None = None,
                   notes: list[str] | None = None) -> set[str]:
     """Passed courses from the artifact, plus anything the user typed.
@@ -724,7 +729,7 @@ def _pack(bundles: list[Bundle], pending: dict[str, Course],
             # because the cap stopped us — so the cap is not the thing to relax.
             notes.append(
                 f"{_term_label(index).lower().capitalize()} comes to only "
-                f"{units:g} units, below the {min_units:g}-unit full-time "
+                f"{_units(units)}, below the {min_units:g}-unit full-time "
                 "minimum for undergraduates (Undergraduate §10.1). That is "
                 "expected if you are graduating; otherwise ask your College "
                 "Associate Dean."
@@ -737,7 +742,7 @@ def _pack(bundles: list[Bundle], pending: dict[str, Course],
 
     if not blocked and len(terms) >= 2 and terms[-1].units <= GRADUATING_OVERLOAD_UNITS:
         notes.append(
-            f"The final term is only {terms[-1].units:g} units. Undergraduate "
+            f"The final term is only {_units(terms[-1].units)}. Undergraduate "
             f"§10.2 lets a graduating student overload by up to "
             f"{GRADUATING_OVERLOAD_UNITS:g} units with approval, so this plan "
             "could finish one term earlier — that is a conversation with your "

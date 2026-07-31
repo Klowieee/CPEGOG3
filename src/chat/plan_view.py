@@ -10,7 +10,7 @@ Inputs:
     A rich Console, a ChatEngine, and Settings; then keyboard input.
 
 Outputs:
-    Terminal output, and a Mermaid flowchart written under planner.plan_dir.
+    Terminal output, and an HTML study plan written under planner.plan_dir.
 
 Dependencies:
     rich, src.chat.core, src.curriculum.*, src.utils.config.
@@ -47,7 +47,7 @@ from src.curriculum.model import (
     total_units,
     write_curriculum_yaml,
 )
-from src.curriculum.mermaid import render_plan_markdown, write_plan_markdown
+from src.curriculum.html_report import render_plan_html, write_plan_html
 from src.curriculum.policy import MISSING_CITATION_NOTE
 from src.utils.config import Settings
 
@@ -441,8 +441,8 @@ def render_plan(console: Console, result: CoursePlan,
                   "[/dim]")
 
     if artifact_path is not None:
-        console.print(f"\nFlowchart written to [bold]{artifact_path}[/bold]")
-        console.print("[dim]Open it in VS Code or on GitHub to see the diagram."
+        console.print(f"\nPlan written to [bold]{artifact_path}[/bold]")
+        console.print("[dim]Open it in any browser — it prints cleanly too."
                       "[/dim]")
 
 
@@ -548,7 +548,7 @@ def run_plan(console: Console, engine: ChatEngine, settings: Settings) -> None:
     taken, attempted = picked
 
     result = engine.plan_courses(curriculum, taken, attempted)
-    artifact = _write_flowchart(console, result, settings)
+    artifact = _write_plan_page(console, result, settings)
     render_plan(console, result, artifact)
 
     if yaml_path is not None:
@@ -611,17 +611,20 @@ def _load_or_extract(console: Console, path: Path, settings: Settings):
     return curriculum, yaml_path, columns
 
 
-def _write_flowchart(console: Console, result: CoursePlan,
+def _write_plan_page(console: Console, result: CoursePlan,
                      settings: Settings) -> Path | None:
+    """Write the printable HTML plan. Returns its path, or None on failure."""
     try:
-        text = render_plan_markdown(
+        passed = result.taken or {c.code for c in result.curriculum.courses.values()
+                                  if c.taken}
+        text = render_plan_html(
             result.plan, result.curriculum, result.policy,
-            direction=settings.planner.mermaid_direction,
             include_taken=settings.planner.include_taken,
-            taken=result.taken or None)
+            taken=result.taken or None,
+            downstream=_downstream_for_display(result.curriculum, passed))
         path = (settings.planner.plan_dir /
-                f"{result.curriculum.program_id}-plan.md")
-        return write_plan_markdown(text, path)
+                f"{result.curriculum.program_id}-plan.html")
+        return write_plan_html(text, path)
     except OSError as exc:
-        console.print(f"\n[yellow]Could not write the flowchart: {exc}[/yellow]")
+        console.print(f"\n[yellow]Could not write the plan page: {exc}[/yellow]")
         return None
