@@ -10,8 +10,10 @@ to run on every query. It's intentionally simple — good enough for a
 class project; a production system would likely use sentence-embeddings.
 """
 import json
+import re
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
 
 FALLBACK_MESSAGE = (
@@ -23,6 +25,28 @@ FALLBACK_MESSAGE = (
 
 DEFAULT_THRESHOLD = 0.12  # tune this after testing on real queries
 
+_WORD_RE = re.compile(r"[a-z']+")
+
+
+def _naive_stem(word: str) -> str:
+    """Minimal suffix stripping so plurals match their singular form
+    (e.g. 'failures' <-> 'failure', 'units' <-> 'unit'). Not a real
+    stemmer — just enough to stop exact-token TF-IDF matching from
+    scoring a correct FAQ at 0.0 purely because the question used a
+    plural where the FAQ used a singular, or vice versa."""
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith(("ses", "xes", "zes", "ches", "shes")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _tokenize(text: str):
+    words = _WORD_RE.findall(text.lower())
+    return [_naive_stem(w) for w in words if w not in ENGLISH_STOP_WORDS]
+
 
 class DomainGuard:
     def __init__(self, faq_path: str, threshold: float = DEFAULT_THRESHOLD):
@@ -31,7 +55,8 @@ class DomainGuard:
         self.reference_texts = [
             f"{item.get('category', '')} {item['question']}" for item in self.faq_items
         ]
-        self.vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+        self.vectorizer = TfidfVectorizer(tokenizer=_tokenize, token_pattern=None,
+                                           ngram_range=(1, 2))
         self.reference_matrix = self.vectorizer.fit_transform(self.reference_texts)
 
     def _similarities(self, query: str):
