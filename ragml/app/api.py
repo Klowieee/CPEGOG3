@@ -19,7 +19,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 
 sys.path.append(str(Path(__file__).resolve().parent.parent / "model"))
-from domain_guard import DomainGuard          # noqa: E402
+from domain_guard import DomainGuard, FALLBACK_MESSAGE  # noqa: E402
 from prompt_template import build_prompt       # noqa: E402
 from handbook_retriever import HandbookRetriever  # noqa: E402
 
@@ -38,11 +38,20 @@ DIRECT_ANSWER_THRESHOLD = 0.30
 # tuned separately.
 HANDBOOK_MATCH_THRESHOLD = 0.45
 
+# The domain guard alone only knows the 32 FAQ pairs' vocabulary — a real
+# handbook topic missing from those 32 examples (e.g. "attire") would
+# otherwise get wrongly rejected as off-topic before the full-handbook
+# retriever below ever gets a chance to look. A question counts as
+# in-domain if EITHER the FAQ set OR the full handbook text scores it
+# above its own (much lower) floor.
+HANDBOOK_DOMAIN_FLOOR = 0.25
+
 # Populated in main() once the model/guard/retriever are loaded, so a
 # single worker process holds them in memory instead of reloading per-request.
 STATE = {"guard": None, "generate": None, "retriever": None,
          "direct_threshold": DIRECT_ANSWER_THRESHOLD,
-         "handbook_threshold": HANDBOOK_MATCH_THRESHOLD}
+         "handbook_threshold": HANDBOOK_MATCH_THRESHOLD,
+         "handbook_domain_floor": HANDBOOK_DOMAIN_FLOOR}
 
 
 def load_generator(model_path: str):
@@ -97,19 +106,23 @@ def chat():
 
     guard = STATE["guard"]
     generate = STATE["generate"]
+    retriever = STATE["retriever"]
     start = time.time()
 
-    in_domain, fallback = guard.check(message)
+    matched_item, score = guard.top_match(message)
+    label, passage, hb_score = retriever.top_match(message)
+
+    # Reject as off-topic only if NEITHER the FAQ set NOR the full
+    # handbook text found anything plausibly relevant.
+    in_domain = (score >= guard.threshold) or (passage is not None and hb_score >= STATE["handbook_domain_floor"])
     if not in_domain:
         elapsed = round(time.time() - start, 2)
         return jsonify({
-            "response": fallback,
+            "response": FALLBACK_MESSAGE,
             "citations": [],
             "sources": [{"type": "sql", "label": "out of scope"}],
             "elapsed": elapsed,
         })
-
-    matched_item, score = guard.top_match(message)
 
     if score >= STATE["direct_threshold"]:
         # Close FAQ match — return the real, human-written answer directly.
@@ -126,10 +139,6 @@ def chat():
             "sources": sources,
             "elapsed": elapsed,
         })
-
-    # No close FAQ match — try the full handbook text before generating.
-    retriever = STATE["retriever"]
-    label, passage, hb_score = retriever.top_match(message)
 
     if passage and hb_score >= STATE["handbook_threshold"]:
         elapsed = round(time.time() - start, 2)
@@ -188,6 +197,9 @@ def main():
     parser.add_argument("--handbook-threshold", type=float, default=HANDBOOK_MATCH_THRESHOLD,
                          help="Similarity above which a matched handbook passage is "
                               "returned directly instead of generated")
+    parser.add_argument("--handbook-domain-floor", type=float, default=HANDBOOK_DOMAIN_FLOOR,
+                         help="Handbook similarity above which a question counts as "
+                              "in-domain even without a decent FAQ match")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     args = parser.parse_args()
@@ -199,6 +211,7 @@ def main():
     STATE["guard"] = DomainGuard(**guard_kwargs)
     STATE["direct_threshold"] = args.direct_threshold
     STATE["handbook_threshold"] = args.handbook_threshold
+    STATE["handbook_domain_floor"] = args.handbook_domain_floor
 
     print("Loading handbook retriever (first run builds+caches the index)...")
     STATE["retriever"] = HandbookRetriever(text_path=args.handbook)

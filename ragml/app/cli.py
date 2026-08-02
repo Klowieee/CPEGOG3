@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent / "model"))
-from domain_guard import DomainGuard          # noqa: E402
+from domain_guard import DomainGuard, FALLBACK_MESSAGE  # noqa: E402
 from prompt_template import build_prompt       # noqa: E402
 from handbook_retriever import HandbookRetriever  # noqa: E402
 
@@ -74,6 +74,14 @@ DIRECT_ANSWER_THRESHOLD = 0.30
 # scale than the FAQ's TF-IDF score, so this threshold is tuned separately.
 HANDBOOK_MATCH_THRESHOLD = 0.45
 
+# The domain guard alone only knows the 32 FAQ pairs' vocabulary — a real
+# handbook topic missing from those 32 examples (e.g. "attire") would
+# otherwise get wrongly rejected as off-topic before the full-handbook
+# retriever below ever gets a chance to look. A question counts as
+# in-domain if EITHER the FAQ set OR the full handbook text scores it
+# above its own (much lower) floor.
+HANDBOOK_DOMAIN_FLOOR = 0.25
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -90,6 +98,9 @@ def main():
     parser.add_argument("--handbook-threshold", type=float, default=HANDBOOK_MATCH_THRESHOLD,
                          help="Similarity above which a matched handbook passage is "
                               "returned directly instead of generated")
+    parser.add_argument("--handbook-domain-floor", type=float, default=HANDBOOK_DOMAIN_FLOOR,
+                         help="Handbook similarity above which a question counts as "
+                              "in-domain even without a decent FAQ match")
     args = parser.parse_args()
 
     print("Loading domain guard...")
@@ -117,18 +128,21 @@ def main():
         if not query:
             continue
 
-        in_domain, fallback = guard.check(query)
+        matched_item, score = guard.top_match(query)
+        label, passage, hb_score = retriever.top_match(query)
+
+        # Reject as off-topic only if NEITHER the 32 FAQ pairs NOR the
+        # full 339-page handbook found anything plausibly relevant.
+        in_domain = (score >= guard.threshold) or (passage is not None and hb_score >= args.handbook_domain_floor)
         if not in_domain:
-            print(f"RAGML: {fallback}\n")
+            print(f"RAGML: {FALLBACK_MESSAGE}\n")
             continue
 
-        matched_item, score = guard.top_match(query)
         if score >= args.direct_threshold:
             print(f"RAGML: {matched_item['answer']}")
             print(f"  (matched FAQ, similarity {score:.2f}: \"{matched_item['question']}\")\n")
             continue
 
-        label, passage, hb_score = retriever.top_match(query)
         if passage and hb_score >= args.handbook_threshold:
             print(f"RAGML: {passage}")
             print(f"  (matched handbook passage, similarity {hb_score:.2f}: {label})\n")
