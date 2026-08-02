@@ -56,15 +56,15 @@
     .spine.open { width: 250px; align-items: stretch; }
 
     .spine-mark {
-      width: 28px; height: 28px;
+      width: 28px;
+      height: 28px;
       border-radius: 8px;
-      background: var(--accent-dark);
-      color: var(--white);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      font-weight: 500;
-      flex-shrink: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      flex-shrink:0;
+      background:transparent;
     }
     .spine.open .spine-mark { margin: 0 0 14px 16px; }
     .spine:not(.open) .spine-mark { margin-top: 2px; }
@@ -191,14 +191,15 @@
       animation: fadeUp 0.4s ease;
     }
     .welcome-avatar {
-      width: 44px; height: 44px;
-      border-radius: 12px;
-      background: var(--accent-dark);
-      color: var(--white);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 16px;
-      margin-bottom: 16px;
+      width:44px;
+      height:44px;
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      margin-bottom:16px;
+      background:transparent;
     }
     .welcome h1 {
       font-size: 1.5rem;
@@ -271,15 +272,16 @@
     /* Assistant: no bubble, left-aligned with small avatar, Claude-style */
     .msg.bot-row { display: flex; align-items: flex-start; gap: 10px; align-self: stretch; }
     .bot-avatar {
-      width: 24px; height: 24px;
-      border-radius: 7px;
-      background: var(--accent-dark);
-      color: var(--white);
-      flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10.5px;
-      margin-top: 2px;
+      width:24px;
+      height:24px;
+      border-radius:7px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      flex-shrink:0;
+      margin-top:2px;
+      background:transparent;
     }
     .msg.bot {
       font-size: 15px;
@@ -422,7 +424,14 @@
     .chat-area::-webkit-scrollbar { width: 5px; }
     .chat-area::-webkit-scrollbar-track { background: transparent; }
     .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
+    .spine-mark img,
+    .welcome-avatar img,
+    .bot-avatar img{
+      display:block;
+      width:80%;
+      height:80%;
+      object-fit:contain;
+    }
     /* ── Mobile ── */
     @media (max-width: 640px) {
       .spine { width: 40px; }
