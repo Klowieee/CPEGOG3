@@ -4,20 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RAGML — Student Handbook Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    /* ── Tokens ── */
+    /* ── Tokens ──
+       Parchment + deep green + gold: the reference-desk / card-catalog
+       palette of the handbook itself, not a generic AI-chat theme. */
     :root {
-      --paper:      #f5f6f2;
-      --paper-dim:  #eceee7;
-      --ink:        #17181c;
-      --ink-soft:   #4b4f49;
-      --ink-faint:  #8b8f86;
-      --line:       #dadcd3;
-      --stamp:      #a8341f;
-      --stamp-soft: #f1e2dc;
-      --gold:       #b98a3d;
-      --white:      #ffffff;
+      --paper:      #f2eee2;
+      --panel:      #e8e0cb;
+      --ink:        #201c15;
+      --ink-soft:   #5c5646;
+      --ink-faint:  #9c9280;
+      --rule:       #d6c9a6;
+      --green:      #0e3b2e;
+      --green-deep: #082821;
+      --green-wash: #e3e9e2;
+      --gold:       #b1812a;
+      --gold-soft:  #f4e7c9;
+      --white:      #fffdf7;
     }
 
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -25,104 +29,111 @@
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
     body {
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: 'Inter', sans-serif;
       background: var(--paper);
       color: var(--ink);
       display: flex;
       height: 100vh;
       overflow: hidden;
     }
-    ::selection { background: var(--stamp-soft); color: var(--stamp); }
+    ::selection { background: var(--gold-soft); color: var(--green-deep); }
 
-    /* ── Spine (collapsed sidebar) ── */
+    /* ── Spine (card-catalog tab) ── */
     .spine {
-      width: 60px;
+      width: 56px;
       flex-shrink: 0;
-      background: var(--paper-dim);
-      border-right: 1px solid var(--line);
+      background: var(--green);
+      color: var(--white);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 0;
-      transition: width 0.28s ease;
+      padding: 22px 0;
+      transition: width 0.3s cubic-bezier(.4,0,.2,1);
       overflow: hidden;
       position: relative;
       z-index: 2;
     }
-    .spine.open { width: 260px; align-items: stretch; }
+    .spine.open { width: 268px; align-items: stretch; }
 
     .spine-mark {
       writing-mode: vertical-rl;
-      font-family: 'Newsreader', serif;
+      font-family: 'Fraunces', serif;
       font-style: italic;
-      font-size: 15px;
-      letter-spacing: 0.08em;
-      color: var(--ink);
-      padding-bottom: 10px;
+      font-weight: 500;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      color: var(--gold-soft);
+      padding-bottom: 6px;
       white-space: nowrap;
     }
     .spine.open .spine-mark { display: none; }
 
-    .spine-drawer { display: none; padding: 4px 22px 0; }
+    .spine-drawer { display: none; padding: 6px 22px 0; }
     .spine.open .spine-drawer { display: block; }
 
+    .drawer-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(244,231,201,0.18);
+      border-radius: 2px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
     .drawer-eyebrow {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 9.5px;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--ink-faint);
-      margin: 18px 0 8px;
+      color: var(--gold);
+      margin-bottom: 10px;
     }
-    .drawer-eyebrow:first-child { margin-top: 0; }
     .drawer-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 12px;
+      padding: 4px 0;
+      font-size: 11.5px;
     }
-    .drawer-row:last-of-type { border-bottom: none; }
-    .drawer-label { color: var(--ink-soft); }
+    .drawer-label { color: rgba(244,247,244,0.55); }
     .drawer-value {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11.5px;
-      color: var(--stamp);
+      font-size: 11px;
+      color: var(--gold-soft);
     }
 
+    /* Ribbon-bookmark toggle — the one deliberate flourish */
     .spine-toggle {
       margin-top: auto;
-      width: 30px; height: 30px;
-      border: 1px solid var(--line);
-      background: var(--white);
-      border-radius: 3px;
+      width: 34px; height: 44px;
+      border: none;
+      background: var(--gold);
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
       cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--ink-soft);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 10px;
+      color: var(--green-deep);
       flex-shrink: 0;
-      transition: border-color 0.2s, color 0.2s;
+      transition: background 0.2s;
     }
-    .spine-toggle:hover { border-color: var(--stamp); color: var(--stamp); }
-    .spine.open .spine-toggle { align-self: flex-start; margin: 18px 22px 0; }
-    .spine-toggle svg { transition: transform 0.28s ease; }
+    .spine-toggle:hover { background: var(--gold-soft); }
+    .spine.open .spine-toggle { align-self: flex-start; margin: 4px 0 0 22px; }
+    .spine-toggle svg { transition: transform 0.3s ease; }
     .spine.open .spine-toggle svg { transform: rotate(180deg); }
 
     .spine-foot {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 9px;
-      color: var(--ink-faint);
-      letter-spacing: 0.06em;
+      color: rgba(244,247,244,0.5);
+      letter-spacing: 0.05em;
       display: none;
     }
-    .spine.open .spine-foot { display: block; padding: 16px 22px 0; }
+    .spine.open .spine-foot { display: block; padding: 14px 22px 0; }
     .spine-dot {
       width: 5px; height: 5px;
       border-radius: 50%;
       background: var(--gold);
       display: inline-block;
       margin-right: 6px;
-      box-shadow: 0 0 4px var(--gold);
+      box-shadow: 0 0 5px var(--gold);
       animation: pulse 2.2s infinite;
     }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity: 0.35; } }
@@ -143,13 +154,14 @@
       padding: 0 32px;
       gap: 14px;
       flex-shrink: 0;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--rule);
     }
     .topbar-title {
-      font-family: 'Newsreader', serif;
+      font-family: 'Fraunces', serif;
       font-style: italic;
+      font-weight: 500;
       font-size: 1.05rem;
-      color: var(--ink);
+      color: var(--green);
       flex: 1;
     }
     .model-chip {
@@ -176,33 +188,33 @@
     }
     .chat-inner {
       width: 100%;
-      max-width: 620px;
+      max-width: 640px;
       display: flex;
       flex-direction: column;
       gap: 0;
     }
 
-    /* ── Welcome ── */
+    /* ── Welcome (handbook cover) ── */
     .welcome {
-      padding: 10px 4px 36px;
+      padding: 8px 4px 34px;
       animation: fadeUp 0.5s ease;
-      border-bottom: 1px solid var(--line);
-      margin-bottom: 28px;
+      border-bottom: 2px solid var(--green);
+      margin-bottom: 30px;
     }
     .welcome-eyebrow {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 10px;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--gold);
       margin-bottom: 14px;
     }
     .welcome h1 {
-      font-family: 'Newsreader', serif;
+      font-family: 'Fraunces', serif;
       font-style: italic;
-      font-weight: 500;
-      font-size: 2rem;
-      color: var(--ink);
+      font-weight: 600;
+      font-size: 2.05rem;
+      color: var(--green);
       margin-bottom: 12px;
       line-height: 1.15;
     }
@@ -211,15 +223,15 @@
       color: var(--ink-soft);
       line-height: 1.65;
       max-width: 460px;
-      margin-bottom: 26px;
+      margin-bottom: 24px;
     }
     .index-label {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 9.5px;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--ink-faint);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .suggestions {
       display: flex;
@@ -228,34 +240,29 @@
     .suggestion-chip {
       background: none;
       border: none;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--rule);
       color: var(--ink);
-      padding: 11px 2px;
+      padding: 12px 2px;
       font-size: 13.5px;
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: 'Inter', sans-serif;
       cursor: pointer;
       text-align: left;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      align-items: baseline;
       gap: 12px;
       transition: color 0.15s, padding-left 0.15s;
+      width: 100%;
     }
-    .suggestion-chip:last-child { border-bottom: 1px solid var(--line); }
-    .suggestion-chip::after {
-      content: '→';
-      color: var(--ink-faint);
-      font-size: 13px;
-      transition: transform 0.15s, color 0.15s;
+    .suggestion-chip .clause {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--gold);
+      flex-shrink: 0;
     }
-    .suggestion-chip:hover {
-      color: var(--stamp);
-      padding-left: 6px;
-    }
-    .suggestion-chip:hover::after {
-      color: var(--stamp);
-      transform: translateX(3px);
-    }
+    .suggestion-chip .qcopy { flex: 1; }
+    .suggestion-chip:last-child { border-bottom: 1px solid var(--rule); }
+    .suggestion-chip:hover { color: var(--green); padding-left: 6px; }
+    .suggestion-chip:hover .clause { color: var(--green); }
 
     @keyframes fadeUp {
       from { opacity:0; transform: translateY(10px); }
@@ -264,7 +271,7 @@
 
     /* ── Messages ── */
     .message-group {
-      margin-bottom: 22px;
+      margin-bottom: 24px;
       animation: fadeUp 0.3s ease;
     }
 
@@ -277,19 +284,33 @@
       padding-bottom: 10px;
     }
     .msg.user .qmark { color: var(--gold); flex-shrink: 0; }
-    .msg.user .qtext { color: var(--ink); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; }
+    .msg.user .qtext { color: var(--ink); font-family: 'Inter', sans-serif; font-size: 14px; }
 
+    /* Marginalia treatment: a green rule + gold pin, like an annotation
+       stamped in the margin of a bound handbook. */
     .msg.bot {
-      font-family: 'Newsreader', serif;
+      font-family: 'Fraunces', serif;
+      font-weight: 500;
       font-size: 16px;
       line-height: 1.7;
       color: var(--ink);
       white-space: pre-wrap;
-      padding: 2px 0 4px;
+      padding: 4px 0 4px 18px;
+      border-left: 2px solid var(--green);
+      position: relative;
+    }
+    .msg.bot::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      top: 6px;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
     }
     .msg.bot sup {
       font-family: 'IBM Plex Mono', monospace;
-      color: var(--stamp);
+      color: var(--green);
       font-size: 11px;
       margin-left: 1px;
     }
@@ -299,14 +320,13 @@
       display: flex;
       align-items: baseline;
       gap: 8px;
-      padding: 8px 0 4px;
-      margin-top: 6px;
-      border-top: 1px solid var(--line);
+      padding: 9px 0 4px 18px;
+      margin-top: 2px;
     }
     .source-mark {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 11px;
-      color: var(--stamp);
+      color: var(--green);
       flex-shrink: 0;
     }
     .source-chip {
@@ -318,15 +338,14 @@
       color: var(--gold);
       font-weight: 500;
     }
-    /* off-topic stamp treatment */
+    /* off-topic: stamped like a rejection mark on a returned form */
     .source-chip.sql {
       display: inline-block;
-      border: 1px solid var(--stamp);
-      color: var(--stamp);
+      border: 1px solid var(--ink-faint);
+      color: var(--ink-soft);
       padding: 2px 8px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      transform: rotate(-2deg);
       font-size: 9.5px;
     }
 
@@ -335,7 +354,7 @@
       display: flex;
       gap: 5px;
       align-items: center;
-      padding: 10px 0;
+      padding: 10px 0 10px 18px;
       animation: fadeUp 0.3s ease;
     }
     .typing-row span {
@@ -360,20 +379,22 @@
     }
     .input-wrap {
       width: 100%;
-      max-width: 620px;
+      max-width: 640px;
       display: flex;
       align-items: center;
       gap: 10px;
-      border-bottom: 1.5px solid var(--line);
-      padding: 8px 2px;
+      background: var(--white);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 10px 14px;
       transition: border-color 0.2s;
     }
-    .input-wrap:focus-within { border-color: var(--stamp); }
+    .input-wrap:focus-within { border-color: var(--green); }
     .input-wrap input {
       flex: 1;
       border: none;
       outline: none;
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: 'Inter', sans-serif;
       font-size: 14px;
       color: var(--ink);
       background: transparent;
@@ -382,43 +403,43 @@
     .input-wrap input::placeholder { color: var(--ink-faint); }
     .input-wrap input:disabled { color: var(--ink-faint); }
     .send-btn {
-      width: 28px; height: 28px;
+      width: 30px; height: 30px;
       border-radius: 3px;
       border: none;
-      background: none;
-      color: var(--ink);
+      background: var(--green);
+      color: var(--white);
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: color 0.2s, background 0.2s;
+      transition: background 0.2s;
       flex-shrink: 0;
     }
-    .send-btn:hover { color: var(--stamp); background: var(--stamp-soft); }
-    .send-btn:disabled { color: var(--ink-faint); background: none; cursor: not-allowed; }
+    .send-btn:hover { background: var(--green-deep); }
+    .send-btn:disabled { background: var(--rule); color: var(--ink-faint); cursor: not-allowed; }
 
     .footer-note {
       text-align: center;
       font-size: 10.5px;
       color: var(--ink-faint);
       margin-top: 10px;
-      max-width: 620px;
+      max-width: 640px;
       margin-left: auto;
       margin-right: auto;
     }
 
     button:focus-visible, input:focus-visible, .suggestion-chip:focus-visible {
-      outline: 2px solid var(--stamp);
+      outline: 2px solid var(--green);
       outline-offset: 2px;
     }
 
     /* ── Scrollbar ── */
     .chat-area::-webkit-scrollbar { width: 5px; }
     .chat-area::-webkit-scrollbar-track { background: transparent; }
-    .chat-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
 
     /* ── Mobile ── */
     @media (max-width: 640px) {
-      .spine { width: 44px; }
-      .spine.open { width: 220px; }
+      .spine { width: 42px; }
+      .spine.open { width: 226px; }
       .topbar { padding: 0 18px; }
       .chat-area { padding: 28px 16px 16px; }
       .welcome h1 { font-size: 1.6rem; }
@@ -432,21 +453,24 @@
   <div class="spine-mark">RAGML — Handbook Assistant</div>
 
   <div class="spine-drawer">
-    <div class="drawer-eyebrow">Domain guard</div>
-    <div class="drawer-row"><span class="drawer-label">strategy</span><span class="drawer-value">TF-IDF cosine</span></div>
-    <div class="drawer-row"><span class="drawer-label">threshold</span><span class="drawer-value">0.12</span></div>
-    <div class="drawer-row"><span class="drawer-label">reference set</span><span class="drawer-value">24 pairs</span></div>
-    <div class="drawer-row"><span class="drawer-label">categories</span><span class="drawer-value">9</span></div>
-
-    <div class="drawer-eyebrow">Generation</div>
-    <div class="drawer-row"><span class="drawer-label">model</span><span class="drawer-value">gpt2</span></div>
-    <div class="drawer-row"><span class="drawer-label">temperature</span><span class="drawer-value">0.7</span></div>
-    <div class="drawer-row"><span class="drawer-label">max_new_tokens</span><span class="drawer-value">80</span></div>
-    <div class="drawer-row"><span class="drawer-label">top_p</span><span class="drawer-value">0.9</span></div>
+    <div class="drawer-card">
+      <div class="drawer-eyebrow">Domain guard</div>
+      <div class="drawer-row"><span class="drawer-label">strategy</span><span class="drawer-value">TF-IDF cosine</span></div>
+      <div class="drawer-row"><span class="drawer-label">threshold</span><span class="drawer-value">0.12</span></div>
+      <div class="drawer-row"><span class="drawer-label">reference set</span><span class="drawer-value">24 pairs</span></div>
+      <div class="drawer-row"><span class="drawer-label">categories</span><span class="drawer-value">9</span></div>
+    </div>
+    <div class="drawer-card">
+      <div class="drawer-eyebrow">Generation</div>
+      <div class="drawer-row"><span class="drawer-label">model</span><span class="drawer-value">gpt2</span></div>
+      <div class="drawer-row"><span class="drawer-label">temperature</span><span class="drawer-value">0.7</span></div>
+      <div class="drawer-row"><span class="drawer-label">max_new_tokens</span><span class="drawer-value">80</span></div>
+      <div class="drawer-row"><span class="drawer-label">top_p</span><span class="drawer-value">0.9</span></div>
+    </div>
   </div>
 
   <button class="spine-toggle" id="spineToggle" onclick="toggleSpine()" aria-label="Toggle pipeline details">
-    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
       <path d="M9 18l6-6-6-6"/>
     </svg>
   </button>
@@ -468,29 +492,29 @@
       <div class="welcome" id="welcome">
         <div class="welcome-eyebrow">Ask the handbook</div>
         <h1>What do you need to know?</h1>
-        <p>Answers are drawn strictly from the student handbook."</p>
-        <div class="index-label">Try one of these</div>
+        <p>Answers are drawn strictly from the student handbook — the assistant declines anything outside its pages rather than guessing.</p>
+        <div class="index-label">Frequently cited clauses</div>
         <div class="suggestions">
-          <button class="suggestion-chip" onclick="ask(this)">How many absences before I fail a class?</button>
-          <button class="suggestion-chip" onclick="ask(this)">What is the grading scale?</button>
-          <button class="suggestion-chip" onclick="ask(this)">GPA needed for the Dean's Honors List?</button>
-          <button class="suggestion-chip" onclick="ask(this)">How many times can I shift programs?</button>
-          <button class="suggestion-chip" onclick="ask(this)">How do I file a grievance against a faculty member?</button>
-          <button class="suggestion-chip" onclick="ask(this)">Does the school have a mental health policy?</button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Attendance</span><span class="qcopy">How many absences before I fail a class?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Grading</span><span class="qcopy">What is the grading scale?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Honors</span><span class="qcopy">GPA needed for the Dean's Honors List?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Enrollment</span><span class="qcopy">How many times can I shift programs?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Grievance</span><span class="qcopy">How do I file a grievance against a faculty member?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Wellbeing</span><span class="qcopy">Does the school have a mental health policy?</span></button>
         </div>
       </div>
     </div>
   </div>
 
   <div class="input-bar">
-    <div style="width:100%; max-width:620px; display:flex; flex-direction:column;">
+    <div style="width:100%; max-width:640px; display:flex; flex-direction:column;">
       <div class="input-wrap">
         <input type="text" id="userInput"
                placeholder="Ask about attendance, grading, enrollment, discipline…"
                autocomplete="off" />
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send">
-          <svg width="15" height="15" fill="none" stroke="currentColor"
-               stroke-width="2.2" viewBox="0 0 24 24">
+          <svg width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2.4" viewBox="0 0 24 24">
             <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
           </svg>
         </button>
@@ -630,7 +654,7 @@
   }
 
   function ask(chip) {
-    userInput.value = chip.textContent;
+    userInput.value = chip.querySelector(".qcopy").textContent;
     sendMessage();
   }
 

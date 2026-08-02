@@ -47,11 +47,14 @@ def load_generator(model_path: str):
     return generate
 
 
+DEFAULT_FAQ_PATH = str(Path(__file__).resolve().parent.parent / "data" / "handbook_faq_real.json")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="gpt2",
                          help="Hugging Face model name or path to fine-tuned checkpoint")
-    parser.add_argument("--faq", default="../data/handbook_faq_real.json")
+    parser.add_argument("--faq", default=DEFAULT_FAQ_PATH)
     parser.add_argument("--threshold", type=float, default=None,
                          help="Override the domain-guard similarity threshold")
     args = parser.parse_args()
