@@ -49,6 +49,13 @@ def load_generator(model_path: str):
 
 DEFAULT_FAQ_PATH = str(Path(__file__).resolve().parent.parent / "data" / "handbook_faq_real.json")
 
+# If a question matches a known FAQ entry closely enough, return that
+# entry's real, human-written answer directly instead of letting GPT-2
+# generate — this is the single biggest accuracy win available without
+# fine-tuning, since it removes generation (and hallucination risk)
+# entirely for anything the FAQ set already covers.
+DIRECT_ANSWER_THRESHOLD = 0.35
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -57,6 +64,9 @@ def main():
     parser.add_argument("--faq", default=DEFAULT_FAQ_PATH)
     parser.add_argument("--threshold", type=float, default=None,
                          help="Override the domain-guard similarity threshold")
+    parser.add_argument("--direct-threshold", type=float, default=DIRECT_ANSWER_THRESHOLD,
+                         help="Similarity above which a matched FAQ answer is "
+                              "returned directly instead of generated")
     args = parser.parse_args()
 
     print("Loading domain guard...")
@@ -86,9 +96,17 @@ def main():
             print(f"RAGML: {fallback}\n")
             continue
 
+        matched_item, score = guard.top_match(query)
+        if score >= args.direct_threshold:
+            print(f"RAGML: {matched_item['answer']}")
+            print(f"  (matched FAQ, similarity {score:.2f}: \"{matched_item['question']}\")\n")
+            continue
+
         prompt = build_prompt(query)
         answer = generate(prompt)
-        print(f"RAGML: {answer}\n")
+        print(f"RAGML: {answer}")
+        print(f"  (generated — closest FAQ match was only {score:.2f}, below "
+              f"direct-answer threshold)\n")
 
 
 if __name__ == "__main__":

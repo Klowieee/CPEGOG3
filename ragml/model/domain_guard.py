@@ -27,23 +27,33 @@ DEFAULT_THRESHOLD = 0.12  # tune this after testing on real queries
 class DomainGuard:
     def __init__(self, faq_path: str, threshold: float = DEFAULT_THRESHOLD):
         self.threshold = threshold
-        faq_items = json.loads(Path(faq_path).read_text(encoding="utf-8"))
+        self.faq_items = json.loads(Path(faq_path).read_text(encoding="utf-8"))
         self.reference_texts = [
-            f"{item.get('category', '')} {item['question']}" for item in faq_items
+            f"{item.get('category', '')} {item['question']}" for item in self.faq_items
         ]
         self.vectorizer = TfidfVectorizer(stop_words="english")
         self.reference_matrix = self.vectorizer.fit_transform(self.reference_texts)
 
-    def is_in_domain(self, query: str) -> bool:
+    def _similarities(self, query: str):
         query_vec = self.vectorizer.transform([query])
-        sims = cosine_similarity(query_vec, self.reference_matrix)
-        return sims.max() >= self.threshold
+        return cosine_similarity(query_vec, self.reference_matrix)[0]
+
+    def is_in_domain(self, query: str) -> bool:
+        return self._similarities(query).max() >= self.threshold
 
     def check(self, query: str):
         """Returns (in_domain: bool, fallback_message_or_none: str|None)"""
         if self.is_in_domain(query):
             return True, None
         return False, FALLBACK_MESSAGE
+
+    def top_match(self, query: str):
+        """Returns (best_faq_item, similarity_score) — the closest known FAQ
+        entry to the query. Used by the API layer to show which handbook
+        entry a generated answer was grounded against."""
+        sims = self._similarities(query)
+        best_idx = int(sims.argmax())
+        return self.faq_items[best_idx], float(sims[best_idx])
 
 
 if __name__ == "__main__":

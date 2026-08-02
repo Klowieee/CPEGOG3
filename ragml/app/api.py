@@ -25,9 +25,15 @@ from prompt_template import build_prompt       # noqa: E402
 APP_DIR = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
 
+# If a question matches a known FAQ entry closely enough, return that
+# entry's real, human-written answer directly instead of letting GPT-2
+# generate — removes generation (and hallucination risk) entirely for
+# anything the FAQ set already covers. Overridable via STATE at startup.
+DIRECT_ANSWER_THRESHOLD = 0.35
+
 # Populated in main() once the model/guard are loaded, so a single worker
 # process holds them in memory instead of reloading per-request.
-STATE = {"guard": None, "generate": None}
+STATE = {"guard": None, "generate": None, "direct_threshold": DIRECT_ANSWER_THRESHOLD}
 
 
 def load_generator(model_path: str):
@@ -84,15 +90,32 @@ def chat():
             "elapsed": elapsed,
         })
 
+    matched_item, score = guard.top_match(message)
+
+    if score >= STATE["direct_threshold"]:
+        # Close FAQ match — return the real, human-written answer directly.
+        # No generation call at all, so no hallucination risk here.
+        elapsed = round(time.time() - start, 2)
+        sources = [{
+            "id": matched_item.get("question", ""),
+            "label": matched_item.get("category", "handbook"),
+            "preview": matched_item.get("answer", "")[:160],
+        }]
+        return jsonify({
+            "response": matched_item.get("answer", ""),
+            "citations": [],
+            "sources": sources,
+            "elapsed": elapsed,
+        })
+
+    # No close FAQ match — fall back to generation, flagged as such via
+    # the source chip's low-confidence label so the frontend can show it.
     prompt = build_prompt(message)
     answer = generate(prompt)
 
-    # Report which FAQ entry the answer was grounded against, for the
-    # frontend's source chips.
-    matched_item, score = guard.top_match(message)
     sources = [{
         "id": matched_item.get("question", ""),
-        "label": matched_item.get("category", "handbook"),
+        "label": f"{matched_item.get('category', 'handbook')} (generated, low match)",
         "preview": matched_item.get("answer", "")[:160],
     }]
 
@@ -115,6 +138,9 @@ def main():
     parser.add_argument("--faq", default=DEFAULT_FAQ_PATH)
     parser.add_argument("--threshold", type=float, default=None,
                          help="Override the domain-guard similarity threshold")
+    parser.add_argument("--direct-threshold", type=float, default=DIRECT_ANSWER_THRESHOLD,
+                         help="Similarity above which a matched FAQ answer is "
+                              "returned directly instead of generated")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     args = parser.parse_args()
@@ -124,6 +150,7 @@ def main():
     if args.threshold is not None:
         guard_kwargs["threshold"] = args.threshold
     STATE["guard"] = DomainGuard(**guard_kwargs)
+    STATE["direct_threshold"] = args.direct_threshold
 
     print(f"Loading model: {args.model} (this may take a moment)")
     STATE["generate"] = load_generator(args.model)
