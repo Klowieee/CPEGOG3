@@ -29,7 +29,7 @@ app = Flask(__name__, static_folder=None)
 # entry's real, human-written answer directly instead of letting GPT-2
 # generate — removes generation (and hallucination risk) entirely for
 # anything the FAQ set already covers. Overridable via STATE at startup.
-DIRECT_ANSWER_THRESHOLD = 0.35
+DIRECT_ANSWER_THRESHOLD = 0.30
 
 # Populated in main() once the model/guard are loaded, so a single worker
 # process holds them in memory instead of reloading per-request.

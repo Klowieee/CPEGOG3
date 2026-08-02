@@ -31,7 +31,7 @@ class DomainGuard:
         self.reference_texts = [
             f"{item.get('category', '')} {item['question']}" for item in self.faq_items
         ]
-        self.vectorizer = TfidfVectorizer(stop_words="english")
+        self.vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
         self.reference_matrix = self.vectorizer.fit_transform(self.reference_texts)
 
     def _similarities(self, query: str):

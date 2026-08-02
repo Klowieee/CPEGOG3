@@ -54,7 +54,7 @@ DEFAULT_FAQ_PATH = str(Path(__file__).resolve().parent.parent / "data" / "handbo
 # generate — this is the single biggest accuracy win available without
 # fine-tuning, since it removes generation (and hallucination risk)
 # entirely for anything the FAQ set already covers.
-DIRECT_ANSWER_THRESHOLD = 0.35
+DIRECT_ANSWER_THRESHOLD = 0.30
 
 
 def main():
