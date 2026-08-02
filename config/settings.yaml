@@ -1,0 +1,137 @@
+# =============================================================================
+# settings.yaml — Central configuration for the DLSU Handbook RAG Chatbot
+#
+# Purpose:  Every tunable parameter lives here so behavior can be changed
+#           without editing code (Architectural Decision AD-6).
+# Used by:  src/utils/config.py (loads and validates this file)
+# Docs:     docs/system_design.md §5 explains each parameter.
+# =============================================================================
+
+document:
+  # Identifier used for the vector DB collection and citation rendering.
+  id: student-handbook-2021-2025
+  title: DLSU Student Handbook
+  edition: AY 2021-2025
+  # Source PDF, relative to the project root.
+  source_pdf: data/handbooks/student-handbook.pdf
+
+paths:
+  processed_dir: data/processed
+  vector_db_dir: data/vector_db
+
+embedding:
+  # Local model; see docs/embedding_strategy.md for why this one.
+  model: BAAI/bge-small-en-v1.5
+  # bge models expect this prefix on QUERIES (not passages).
+  query_prefix: "Represent this sentence for searching relevant passages: "
+
+chunking:
+  # See docs/chunking_strategy.md §3 for justification of each value.
+  target_tokens: 350
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 50
+
+retrieval:
+  top_k: 8
+  # Cosine-similarity floor below which the system refuses without
+  # calling the API. Initial value; tuned during testing (testing.md §4).
+  similarity_floor: 0.35
+
+  # Hybrid retrieval: BM25 keyword ranking fused with the semantic ranking by
+  # reciprocal rank fusion. OFF by default because it was measured on this
+  # corpus and did not pay for itself: semantic search alone already retrieves
+  # the plagiarism provision (5.3.1.1.6) it was meant to rescue, and with only
+  # top_k slots to fill, keyword hits evict good semantic ones — at
+  # keyword_weight 1.0, hit@8 on vague questions dropped 8/10 -> 7/10.
+  # Turn on to experiment; keep keyword_weight at or below 0.5.
+  hybrid:
+    enabled: false
+    rrf_k: 60             # larger = flatter weighting between ranks
+    keyword_weight: 0.5   # keyword rank weight relative to semantic
+
+# Fallback query rewriting: spend ONE small extra LLM call turning a vague
+# question ("what happens if I copy someone's homework") into handbook wording
+# ("academic dishonesty major offense sanction"), then retrieve again.
+#
+# It fires on two triggers, and the second does the real work:
+#   * before generating, if retrieval is hopeless (rare — see margin below);
+#   * after generating, if the model answered NOT_COVERED. A vague question
+#     retrieves on meaning and often lands beside the rule without hitting it,
+#     which is exactly what that refusal means.
+# Questions that answer on the first pass never trigger either one, so the
+# common path costs nothing extra.
+rewrite:
+  enabled: true
+  # Pre-generation trigger: best similarity < similarity_floor + margin. Note
+  # this rarely fires — on a single-domain corpus even off-topic questions
+  # score ~0.5-0.6 against a 0.35 floor.
+  margin: 0.05
+  # Reserved budget for the rewrite call — kept tiny because Groq counts the
+  # reservation against the 6000 TPM cap (see the llm section below). The
+  # post-refusal retry does spend a second full answer call, so a burst of
+  # refused questions can approach that cap.
+  max_output_tokens: 150
+  max_queries: 3
+
+llm:
+  base_url: https://api.groq.com/openai/v1
+  model: llama-3.1-8b-instant
+  api_key_env: GROQ_API_KEY
+  temperature: 0.1
+
+  # Groq's on_demand free tier caps llama-3.1-8b-instant at 6000 TPM, and it
+  # counts this whole reserved budget (not just tokens actually generated)
+  # against that limit alongside the prompt. Our retrieved-excerpts prompt
+  # (top_k=8 chunks) runs ~3200-4000 tokens, so keep this low enough that
+  # prompt + max_output_tokens stays under 6000, or every call 413s.
+  # Only relevant for thinking models (e.g. Gemini 3.x) is max_output_tokens
+  # being billed for invisible reasoning too — not the case here.
+  max_output_tokens: 1500
+  # Optional (omit for providers/models that reject it, like Groq's
+  # llama-3.1-8b-instant). Caps how much of the budget goes to thinking:
+  # minimal | low | medium | high | none.
+  request_timeout_seconds: 30
+  max_retries: 2
+
+chat:
+  refusal_message: >-
+    That doesn't seem to be covered in the Student Handbook (AY 2021-2025).
+    You may want to contact the relevant DLSU office directly.
+
+# Course planning (Phase 15): read a program checklist, work out what can be
+# taken next, and draw the prerequisite flowchart. See docs/course_planner.md.
+#
+# This whole section is OPTIONAL — settings files written before Phase 15 stay
+# valid, and the defaults below are exactly what /plan uses.
+#
+# The unit numbers are not invented here. They mirror the handbook, and the
+# planner retrieves and prints the governing provision beside every constraint
+# it applies (docs/course_planner.md §6). They live in config because they are
+# constants of this handbook edition — and because §10.2 defers to "the number
+# of units indicated on the program checklist", a per-program override belongs
+# in the curriculum YAML (program.max_units), not here.
+planner:
+  # Undergraduate §10.2: maximum academic load for a regular term. This is a
+  # FALLBACK. §10.2 says 15 units "or the number of units indicated on the
+  # program checklist", and when a checklist states its own per-term loads
+  # (engineering programs prescribe 16-19) those govern instead — see the
+  # term_units block in the curriculum artifact, and docs/course_planner.md §5.3.
+  max_units: 15
+  # Undergraduate §10.1: a full-time undergraduate carries at least 12 units.
+  # Used only to WARN — the planner never overloads a term to reach it.
+  min_units: 12
+  # Safety stop for the packing loop; also the horizon shown in the flowchart.
+  max_terms: 8
+  # Undergraduate §10.10.1: a laboratory course is a co-requisite of its lecture
+  # and both are taken in the same term. When the checklist states no
+  # corequisites, pair LBY*/"... Laboratory" courses with their lecture by title.
+  # A DLSU-specific heuristic, so it is always reported as inferred.
+  pair_labs: true
+  # Where the extracted checklist artifact and the generated flowchart go. Both
+  # are gitignored: the curriculum artifact contains your grades.
+  checklist_dir: data/checklists
+  plan_dir: data/plans
+  # Include an "Already passed" panel in the generated plan for context. Turn
+  # it off to print only the work that remains.
+  include_taken: true

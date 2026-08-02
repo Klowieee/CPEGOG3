@@ -1,97 +1,222 @@
-# RAGML — Student Handbook FAQ Chatbot
+# DLSU Student Handbook RAG Chatbot
 
-A domain-specific chatbot that answers student handbook / enrollment / policy
-questions using a small pre-trained Hugging Face model (GPT-2 or DialoGPT),
-adapted via prompt engineering + light fine-tuning, with a **fallback guard**
-that stops the bot from answering questions outside the handbook's scope.
+A local, terminal-based chatbot that answers natural-language questions about
+the **DLSU Student Handbook (AY 2021–2025)** using Retrieval-Augmented
+Generation. Retrieval (embeddings + vector search) runs fully on your machine;
+answer generation uses a hosted small language model via API.
 
-This repo is organized to match your 5-week plan 1:1.
+Undergraduate academic project. Design rationale for every component is in
+[`docs/`](docs/) — start with `architecture.md`.
 
-## Project structure
+## How It Works (one paragraph)
+
+An offline ingestion pipeline parses the handbook PDF, cleans it, splits it
+into ~350-token section-aware chunks (each tagged with its part, section, and
+provision numbers), embeds them locally with `bge-small-en-v1.5`, and stores
+them in ChromaDB. At chat time, your question is embedded, the 8 most similar
+chunks are retrieved, and a small LLM (Llama 3.1 8B via the Groq API) answers
+**using only those excerpts**, citing them by number; the app maps those
+numbers back to real handbook sections. If the excerpts don't answer the
+question, it refuses politely instead of guessing — and if the question was
+simply phrased unlike the handbook, it rewrites the question into handbook
+wording and tries once more before refusing.
+
+The design rationale and the empirical findings behind these choices are
+consolidated in [`docs/project_narrative.md`](docs/project_narrative.md).
+
+> **Just want to run it?** [`RUNNING.md`](RUNNING.md) is a complete
+> step-by-step guide for both features, from a fresh clone, with troubleshooting.
+
+## Setup from a fresh clone
+
+The repository holds **code only**. Every PDF, the vector index, and the
+extracted curriculum are gitignored — the handbook is copyrighted and a
+curriculum file contains a student's grades — so a clone needs the steps below
+before it will answer anything.
+
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+
+**1. Install dependencies.** `uv` reads `pyproject.toml` and creates the venv:
+
+```bash
+git clone https://github.com/Klowieee/CPEGOG3.git
+cd CPEGOG3
+uv sync                  # creates .venv and installs everything (incl. pytest)
+```
+
+> The first sync downloads PyTorch (via sentence-transformers, ~2 GB) — run it
+> on good wifi. `uv` caches packages globally, so later syncs are fast.
+
+**2. Add the handbook PDF** at `data/handbooks/student-handbook.pdf`.
+
+**3. Build the vector index** — one time, a few minutes; it also downloads the
+embedding model (~130 MB) on first run:
+
+```bash
+uv run python scripts/run_ingestion.py
+```
+
+You should end with roughly 369 chunks stored. Everything so far is local.
+
+**4. Set your API key** for answer generation (free key from
+[console.groq.com](https://console.groq.com)):
+
+```bash
+export GROQ_API_KEY="..."        # Windows (PowerShell): $env:GROQ_API_KEY="..."
+```
+
+The key is read from the environment only — never write it into any file in
+this repository. See `.env.example`.
+
+**5. For the course planner only**, add your program checklist PDF to
+`data/checklists/` and extract it once:
+
+```bash
+uv run python scripts/inspect_checklist.py data/checklists/YOUR-CHECKLIST.pdf
+```
+
+Steps 2-4 are for handbook questions; steps 2-3 are skippable if you only want
+`/plan`, which needs neither the handbook index nor an API key.
+
+### Checking it worked
+
+```bash
+uv run pytest                            # ~450 tests, no key or network needed
+uv run python scripts/eval_retrieval.py  # retrieval quality, no LLM involved
+```
+
+## Usage
+
+`uv run` executes a command inside the project environment without needing to
+activate it manually:
+
+```bash
+uv run python scripts/run_ingestion.py   # one-time: build the vector index
+uv run python scripts/run_chat.py        # start the chatbot
+```
+
+(Prefer activating the venv? `source .venv/bin/activate` — Windows:
+`.venv\Scripts\activate` — then run `python scripts/...` directly.)
+
+Inspect the parser output at any time (Phase 2):
+
+```bash
+uv run python scripts/inspect_parse.py                 # role counts for the whole PDF
+uv run python scripts/inspect_parse.py --pages 101 102 # role-tagged view of pages 101-102
+```
+
+Evaluate retrieval quality against the golden set (no LLM needed, Phase 7/11):
+
+```bash
+uv run python scripts/eval_retrieval.py
+```
+
+## Course Planner (Phase 15)
+
+Work out what to enrol in next, and in what order, from your program checklist.
+Ordering is computed from the prerequisite graph in plain code — **no LLM call
+and no API tokens are spent** — while the unit limits it applies are shown with
+real handbook citations retrieved from the local index.
+
+Put your checklist PDF in `data/checklists/`, then inspect what the parser made
+of it before trusting any plan:
+
+```bash
+uv run python scripts/inspect_checklist.py data/checklists/your-checklist.pdf
+```
+
+Its first three lines tell you what it managed to read:
 
 ```
-ragml/
-├── README.md                     ← this file (plan + how to run everything)
-├── requirements.txt
-├── data/
-│   ├── handbook_faq_sample.json  ← original placeholder schema example (safe to delete)
-│   ├── handbook_faq_real.json    ← Week 1: 24 real Q&A pairs pulled from your uploaded DLSU handbook
-│   ├── handbook_full_text.txt    ← full plain-text extraction of the 339-page handbook (for pulling more Q&A pairs)
-│   └── prepare_dataset.py        ← Week 1: cleans raw text/CSV into train-ready JSONL
-├── model/
-│   ├── model_selection_notes.md  ← Week 2: base model comparison + decision
-│   ├── prompt_template.py        ← Week 3: the system prompt / prompt-engineering layer
-│   ├── finetune_gpt2.py          ← Week 3: LoRA fine-tuning script
-│   └── domain_guard.py           ← the "fallback if off-topic" logic
-└── app/
-    └── cli.py                    ← Week 4: terminal chat interface
+PREREQUISITE SOURCE: column   (45 of 103 course(s) have stated prerequisites)
+YEAR/TERM GROUPING:  found (103 of 103 placed)
+ALREADY TAKEN:       0 course(s) (0 units); 103 remaining (209 units)
 ```
 
-## Weekly plan → what to actually do
+It writes `data/checklists/<program>.curriculum.yaml` — a hand-editable file
+listing every course, its units, its prerequisites and corequisites, and whether
+you have passed it. **The planner reads that file, never the PDF**
+(`docs/architecture.md` AD-8), so anything the parser got wrong you fix once, by
+hand, in one place. Re-running the script will not overwrite your corrections
+(pass `--force` if you want it to).
 
-### Week 1 — Data Collection & Environment Setup
-1. **Source information extraction**: done — your uploaded DLSU handbook
-   (AY 2021-2025 edition, 339 pages) was extracted to clean text at
-   `data/handbook_full_text.txt` using `pdftotext -layout` (the PDF has
-   embedded fonts, so extraction is clean, no OCR needed).
-2. **Dataset**: started — `data/handbook_faq_real.json` has 24 real Q&A
-   pairs covering Attendance, Examinations, Grading, Honors, Enrollment,
-   Fees and Scholarships, Discipline, Grievance, and Student Wellbeing,
-   written from the actual policy text (not placeholder content). This is
-   enough to prove the pipeline works, but too small to fine-tune well --
-   see "Growing the dataset" below before Week 3.
-3. **Workspace Initialization**: `pip install -r requirements.txt`, confirm
-   you can load a model (`python model/finetune_gpt2.py --dry-run`).
+> Most DLSU checklists have no grade column — there is nowhere on the sheet to
+> record what you passed. `/plan` asks you to type those courses, or you can set
+> `taken: true` on them in the curriculum file.
 
-#### Growing the dataset past 24 pairs
-`data/handbook_full_text.txt` has the full handbook. Sections not yet
-covered but worth mining: Section 1 (General Directives), Section 2
-(Student Classification beyond shifting), Section 4 (Social Norms),
-the rest of Section 5 (specific discipline offenses and sanctions),
-Appendix C (Student Services), Appendix F (student organizations directory),
-Appendix L (attire policy), and Appendix S (Student Media). Aim for
-100+ pairs total -- grep the file for section/appendix headers to
-navigate it quickly.
+Then, inside the chatbot, type `/plan`. It finds the checklist itself, prints the
+whole program a term at a time, and asks what you have finished:
 
-### Week 2 — Model Selection
-Compare 2–3 small models you can realistically fine-tune on free-tier
-Colab/local CPU-GPU:
-- `distilgpt2` — smallest, fastest, weakest generation quality
-- `gpt2` (124M) — good default, well documented
-- `microsoft/DialoGPT-small` — pre-tuned for conversational turns
+```
+Which terms have you completed? (1-12; e.g. "1-6" or "1-5,7")
+Terms completed: 1-5
+  ✓ 45 course(s) marked from term(s) 1-5
 
-Write your comparison in `model/model_selection_notes.md` (I've drafted a
-starting table — fill in your own benchmark numbers once you test).
+Anything else you've passed? (codes, or Enter to skip)
+Anything in there you HAVEN'T passed? (e.g. a failed course — codes, or Enter) LOGDSGN
+  ↻ LOGDSGN will be planned again, and anything needing them stays blocked
+```
 
-### Week 3 — Training of Model
-- **Design System Prompts**: `model/prompt_template.py` — this is the
-  prompt-engineering layer that goes in front of every generation call,
-  even if you also fine-tune.
-- **Fine-tuning**: `model/finetune_gpt2.py` uses LoRA (via `peft`) so it's
-  light enough to run on a single GPU or Colab T4. Full fine-tuning of even
-  a 124M model on CPU is painfully slow — LoRA is strongly recommended here.
+Whole terms first because that is how progress is actually described; the last
+question is what makes *"I finished terms 1-5 but failed one of them"*
+expressible. A removed course goes back into the plan as a retake, and anything
+depending on it waits.
 
-### Week 4 — CLI Interface Development
-`app/cli.py` ties it together: loads the fine-tuned model, applies the
-system prompt, and — critically — runs every query through
-`model/domain_guard.py` **before** generating a response, so off-topic
-questions get a polite fallback instead of a hallucinated answer.
+You then get a term-by-term plan through to graduation — each term capped at the
+load **your checklist** prescribes — plus a printable HTML page at
+`data/plans/<program>-plan.html`. Open it in any browser.
 
-### Week 5 onwards — Testing & Debugging
-- **Automatic**: BLEU score against held-out FAQ answers (script stub in
-  `data/prepare_dataset.py` comments — happy to build this out once you have
-  real fine-tuned outputs to score).
-- **Human evaluation rubric** (suggested, 1–5 scale each):
-  - *Relevance*: does it answer what was asked?
-  - *Fluency*: is it grammatically coherent?
-  - *Faithfulness*: does it avoid inventing policies not in the handbook?
-  - *Fallback accuracy*: does it correctly decline off-topic questions
-    instead of guessing?
+> `data/checklists/` and `data/plans/` are gitignored: the curriculum file
+> contains your grades.
 
-## Why the fallback matters
-A small fine-tuned GPT-2 will still generate *something* for any prompt,
-even nonsense unrelated to your handbook — it doesn't "know" the boundaries
-of its training data. `domain_guard.py` uses a lightweight similarity check
-(TF-IDF or sentence-embedding cosine similarity against your known FAQ
-topics) to catch out-of-scope questions **before** they reach the generator,
-and returns a fixed, honest fallback message instead.
+Design rationale, and an honest account of what the planner cannot do, are in
+[`docs/course_planner.md`](docs/course_planner.md).
+
+## Run Tests
+
+```bash
+uv run pytest
+```
+
+## Note for pip users
+
+A `requirements.txt` is also provided if you are not using uv:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+The dependency lists in `pyproject.toml` and `requirements.txt` are kept in
+sync. Note that `rank-bm25` is not optional despite hybrid retrieval shipping
+disabled: `src/retrieval/retriever.py` imports it at module level, so the app
+will not start without it.
+
+## Project Structure
+
+See `docs/architecture.md` §3. In short: `src/` holds one package per
+pipeline stage; `scripts/` holds the entry points and inspection tools;
+`config/settings.yaml` holds every tunable parameter; `data/` holds inputs,
+intermediate artifacts, and the vector store; `docs/` holds all design
+documentation.
+
+## Implementation Status
+
+| Phase | Component | Status |
+|---|---|---|
+| 1 | Project setup (structure, config, utils) | ✅ Done |
+| 2 | Document ingestion (PDF parsing) | ✅ Done |
+| 3 | Cleaning | ✅ Done |
+| 4 | Chunking | ✅ Done |
+| 5 | Embedding generation | ✅ Done |
+| 6 | Vector database | ✅ Done |
+| 7 | Retriever | ✅ Done |
+| 8 | Prompt assembly | ✅ Done |
+| 9 | LLM integration | ✅ Done |
+| 10 | Terminal chatbot | ✅ Done |
+| 11 | Testing (golden set) | ✅ Done |
+| 12 | Final documentation | ✅ Done |
+| 13 | Vague-question query rewriting (rescue on model refusal) | ✅ Done |
+| 14 | Hybrid BM25 retrieval (built, measured, disabled by default) | ✅ Done |
+| 15 | Course planner (checklist → prerequisite flowchart) | ✅ Done |
