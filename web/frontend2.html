@@ -588,8 +588,8 @@
     const g = document.createElement("div");
     g.className = "message-group";
     g.innerHTML = refused
-      ? `<div class="msg bot-row"><div class="bot-avatar"><img src="logo.gif" alt="Logo"></div><div class="msg bot refused">${html}</div></div>`
-      : `<div class="msg bot-row"><div class="bot-avatar"><img src="logo.gif" alt="Logo">/div><div class="msg bot">${html}</div></div>`;
+    ? `<div class="msg bot-row"><div class="bot-avatar"><img src="logo.gif" alt="Logo"></div><div class="msg bot refused">${html}</div></div>`
+    : `<div class="msg bot-row"><div class="bot-avatar"><img src="logo.gif" alt="Logo"></div><div class="msg bot">${html}</div></div>`;
 
     // Footnote row: distinguishes a normal cited source, an "unverified"
     // one (the model answered but didn't attribute it, so this is only the
