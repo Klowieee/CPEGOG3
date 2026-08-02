@@ -118,5 +118,45 @@
     "category": "Student Wellbeing",
     "question": "Does DLSU have a mental health policy?",
     "answer": "Yes. DLSU's Mental Health Policy, aligned with the Philippine Mental Health Act (RA 11036), commits to protecting students' and employees' rights, preventing discrimination and stigma, and providing accessible mental health support services as part of a proactive, holistic approach to wellbeing."
+  },
+  {
+    "category": "General Directives",
+    "question": "Do I need to undergo a health exam as a student?",
+    "answer": "Yes. Undergraduate and graduate students are required to undergo a scheduled entrance and annual health examination through the Health Services Office (HSO). If you're diagnosed with a communicable disease or unable to attend class due to a prolonged illness, you also need HSO clearance before returning to the University. All students are required to undergo drug testing as well, per government-mandated guidelines."
+  },
+  {
+    "category": "General Directives",
+    "question": "Can I join organizations that aren't DLSU-accredited?",
+    "answer": "No. The University does not sanction or allow student membership in non-DLSU accredited organizations within the University."
+  },
+  {
+    "category": "Social Norms",
+    "question": "Can professors set their own rules on phones and laptops in class?",
+    "answer": "Yes. Faculty members define appropriate use of electronic devices (phones, laptops, etc.) to support instruction, and can set additional reasonable classroom policies as long as they don't infringe on other University rules and are mutually agreed upon with students."
+  },
+  {
+    "category": "Social Norms",
+    "question": "What happens if I violate a professor's classroom policy?",
+    "answer": "You may be asked to report immediately to the Student Discipline Formation Office (SDFO) for investigation. You'll need to obtain a Re-admission Slip — without it, you can't be re-admitted to class, take exams, or enroll. You're marked absent for every session missed until you're readmitted."
+  },
+  {
+    "category": "Discontinuance",
+    "question": "What's the difference between an Honorable Dismissal and getting expelled?",
+    "answer": "An Honorable Dismissal (Certificate of Transfer Credentials) is issued at your own request through the Office of the University Registrar. Expulsion, by contrast, is initiated by the University for committing a major offense and carries a warning to other schools about your record. Academic ineligibility (exceeding your program's failure-unit limit) is a separate third route that also requires you to request a Certificate of Transfer Credentials to transfer elsewhere."
+  },
+  {
+    "category": "Discontinuance",
+    "question": "Can I get a second copy of my Certificate of Transfer Credentials if I lose it?",
+    "answer": "No. Once issued, the Certificate of Transfer Credentials is a permanent termination of studies and cannot be cancelled — a second copy will not be issued at any time."
+  },
+  {
+    "category": "Student Media",
+    "question": "What counts as \"student media\" at DLSU?",
+    "answer": "Any printed or electronic media produced by students for publication, broadcast, or distribution on or from campus. This includes student publications (newspapers, magazines, newsletters, and similar) as defined under the Campus Journalism Act of 1991, produced by a recognized Student Media Group under the supervision of the Student Media Office (SMO)."
+  },
+  {
+    "category": "Student Media",
+    "question": "What do I need to submit to get my student publication officially recognized?",
+    "answer": "By the first week of Term 1, before classes open, submit a certificate of recognition from your affiliated college/office/unit, plus a proposal covering: the group's purpose and nature, proposed content and platforms, number of copies or release frequency, a list of editorial board members (with CGPA and Certificate of Good Moral Conduct from the SDFO), an activity calendar, and a budget plan."
   }
 ]

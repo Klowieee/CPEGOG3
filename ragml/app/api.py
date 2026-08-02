@@ -21,6 +21,7 @@ from flask import Flask, jsonify, request, send_from_directory
 sys.path.append(str(Path(__file__).resolve().parent.parent / "model"))
 from domain_guard import DomainGuard          # noqa: E402
 from prompt_template import build_prompt       # noqa: E402
+from handbook_retriever import HandbookRetriever  # noqa: E402
 
 APP_DIR = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
@@ -31,9 +32,17 @@ app = Flask(__name__, static_folder=None)
 # anything the FAQ set already covers. Overridable via STATE at startup.
 DIRECT_ANSWER_THRESHOLD = 0.30
 
-# Populated in main() once the model/guard are loaded, so a single worker
-# process holds them in memory instead of reloading per-request.
-STATE = {"guard": None, "generate": None, "direct_threshold": DIRECT_ANSWER_THRESHOLD}
+# Below that, but before falling to raw generation: search the full
+# handbook text itself (not just the FAQ pairs) for the closest real
+# passage. Different similarity scale than the FAQ's TF-IDF score, so
+# tuned separately.
+HANDBOOK_MATCH_THRESHOLD = 0.45
+
+# Populated in main() once the model/guard/retriever are loaded, so a
+# single worker process holds them in memory instead of reloading per-request.
+STATE = {"guard": None, "generate": None, "retriever": None,
+         "direct_threshold": DIRECT_ANSWER_THRESHOLD,
+         "handbook_threshold": HANDBOOK_MATCH_THRESHOLD}
 
 
 def load_generator(model_path: str):
@@ -54,11 +63,21 @@ def load_generator(model_path: str):
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.9,
+                repetition_penalty=1.3,
+                no_repeat_ngram_size=3,
                 pad_token_id=tokenizer.eos_token_id,
             )
         full_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
         prompt_text = tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)
-        return full_text[len(prompt_text):].strip()
+        answer = full_text[len(prompt_text):].strip()
+        # Untuned GPT-2 doesn't know to stop after one answer — it often
+        # keeps pattern-completing the template into a fake follow-up
+        # "### Question:" turn. Cut off anything after the first such marker.
+        for marker in ("###", "Question:", "Instruction:"):
+            idx = answer.find(marker)
+            if idx != -1:
+                answer = answer[:idx].strip()
+        return answer
 
     return generate
 
@@ -108,10 +127,32 @@ def chat():
             "elapsed": elapsed,
         })
 
-    # No close FAQ match — fall back to generation, flagged as such via
-    # the source chip's low-confidence label so the frontend can show it.
+    # No close FAQ match — try the full handbook text before generating.
+    retriever = STATE["retriever"]
+    label, passage, hb_score = retriever.top_match(message)
+
+    if passage and hb_score >= STATE["handbook_threshold"]:
+        elapsed = round(time.time() - start, 2)
+        sources = [{
+            "id": label,
+            "label": label,
+            "preview": passage[:160],
+        }]
+        return jsonify({
+            "response": passage,
+            "citations": [],
+            "sources": sources,
+            "elapsed": elapsed,
+        })
+
+    # No close FAQ or handbook match either — fall back to generation,
+    # flagged as such via the source chip's low-confidence label.
     prompt = build_prompt(message)
     answer = generate(prompt)
+    if not answer:
+        answer = ("I don't have a confident answer for that. The closest handbook "
+                   f"topic I found was \"{matched_item.get('question', '')}\" — try "
+                   "rephrasing closer to that, or check with your adviser directly.")
 
     sources = [{
         "id": matched_item.get("question", ""),
@@ -129,6 +170,7 @@ def chat():
 
 
 DEFAULT_FAQ_PATH = str(Path(__file__).resolve().parent.parent / "data" / "handbook_faq_real.json")
+DEFAULT_HANDBOOK_PATH = str(Path(__file__).resolve().parent.parent / "data" / "handbook_full_text.txt")
 
 
 def main():
@@ -141,6 +183,11 @@ def main():
     parser.add_argument("--direct-threshold", type=float, default=DIRECT_ANSWER_THRESHOLD,
                          help="Similarity above which a matched FAQ answer is "
                               "returned directly instead of generated")
+    parser.add_argument("--handbook", default=DEFAULT_HANDBOOK_PATH,
+                         help="Path to the full handbook text for whole-document retrieval")
+    parser.add_argument("--handbook-threshold", type=float, default=HANDBOOK_MATCH_THRESHOLD,
+                         help="Similarity above which a matched handbook passage is "
+                              "returned directly instead of generated")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     args = parser.parse_args()
@@ -151,6 +198,10 @@ def main():
         guard_kwargs["threshold"] = args.threshold
     STATE["guard"] = DomainGuard(**guard_kwargs)
     STATE["direct_threshold"] = args.direct_threshold
+    STATE["handbook_threshold"] = args.handbook_threshold
+
+    print("Loading handbook retriever (first run builds+caches the index)...")
+    STATE["retriever"] = HandbookRetriever(text_path=args.handbook)
 
     print(f"Loading model: {args.model} (this may take a moment)")
     STATE["generate"] = load_generator(args.model)

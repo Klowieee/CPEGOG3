@@ -4,24 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RAGML — Student Handbook Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     /* ── Tokens ──
-       Parchment + deep green + gold: the reference-desk / card-catalog
-       palette of the handbook itself, not a generic AI-chat theme. */
+       Familiar assistant-chat conventions: warm neutral background,
+       no-bubble assistant replies, right-aligned user bubble, pill
+       composer — modeled on Claude/ChatGPT's own UI patterns, per request. */
     :root {
-      --paper:      #f2eee2;
-      --panel:      #e8e0cb;
-      --ink:        #201c15;
-      --ink-soft:   #5c5646;
-      --ink-faint:  #9c9280;
-      --rule:       #d6c9a6;
-      --green:      #0e3b2e;
-      --green-deep: #082821;
-      --green-wash: #e3e9e2;
-      --gold:       #b1812a;
-      --gold-soft:  #f4e7c9;
-      --white:      #fffdf7;
+      --bg:         #faf9f6;
+      --bg-panel:   #f0efe9;
+      --bg-bubble:  #eeedE7;
+      --text:       #262624;
+      --text-soft:  #55534d;
+      --text-faint: #8e8b83;
+      --border:     #e6e4dc;
+      --accent:     #6b6a63;
+      --accent-dark:#1f1e1c;
+      --focus:      #8ca0c9;
+      --white:      #ffffff;
     }
 
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -30,113 +30,104 @@
     }
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--paper);
-      color: var(--ink);
+      background: var(--bg);
+      color: var(--text);
       display: flex;
       height: 100vh;
       overflow: hidden;
     }
-    ::selection { background: var(--gold-soft); color: var(--green-deep); }
+    ::selection { background: #d9e2f1; color: var(--accent-dark); }
 
-    /* ── Spine (card-catalog tab) ── */
+    /* ── Sidebar (utility drawer, ChatGPT-style icon strip) ── */
     .spine {
-      width: 56px;
+      width: 52px;
       flex-shrink: 0;
-      background: var(--green);
-      color: var(--white);
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 22px 0;
-      transition: width 0.3s cubic-bezier(.4,0,.2,1);
+      padding: 16px 0;
+      transition: width 0.25s ease;
       overflow: hidden;
       position: relative;
       z-index: 2;
     }
-    .spine.open { width: 268px; align-items: stretch; }
+    .spine.open { width: 250px; align-items: stretch; }
 
     .spine-mark {
-      writing-mode: vertical-rl;
-      font-family: 'Fraunces', serif;
-      font-style: italic;
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: var(--accent-dark);
+      color: var(--white);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
       font-weight: 500;
-      font-size: 14px;
-      letter-spacing: 0.05em;
-      color: var(--gold-soft);
-      padding-bottom: 6px;
-      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .spine.open .spine-mark { display: none; }
+    .spine.open .spine-mark { margin: 0 0 14px 16px; }
+    .spine:not(.open) .spine-mark { margin-top: 2px; }
 
-    .spine-drawer { display: none; padding: 6px 22px 0; }
+    .spine-drawer { display: none; padding: 0 14px; overflow-y: auto; flex: 1; }
     .spine.open .spine-drawer { display: block; }
 
-    .drawer-card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(244,231,201,0.18);
-      border-radius: 2px;
-      padding: 14px 16px;
-      margin-bottom: 12px;
-    }
+    .drawer-section { margin-bottom: 18px; }
     .drawer-eyebrow {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 9.5px;
-      letter-spacing: 0.16em;
+      font-size: 11px;
+      font-weight: 600;
       text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 10px;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      margin-bottom: 8px;
+      padding: 0 2px;
     }
     .drawer-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 4px 0;
-      font-size: 11.5px;
+      padding: 5px 2px;
+      font-size: 12.5px;
+      border-radius: 6px;
     }
-    .drawer-label { color: rgba(244,247,244,0.55); }
+    .drawer-label { color: var(--text-soft); }
     .drawer-value {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--gold-soft);
+      font-size: 11.5px;
+      color: var(--text);
     }
 
-    /* Ribbon-bookmark toggle — the one deliberate flourish */
     .spine-toggle {
       margin-top: auto;
-      width: 34px; height: 44px;
-      border: none;
-      background: var(--gold);
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+      width: 30px; height: 30px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      border-radius: 8px;
       cursor: pointer;
-      display: flex; align-items: flex-start; justify-content: center;
-      padding-top: 10px;
-      color: var(--green-deep);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-soft);
       flex-shrink: 0;
-      transition: background 0.2s;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .spine-toggle:hover { background: var(--gold-soft); }
-    .spine.open .spine-toggle { align-self: flex-start; margin: 4px 0 0 22px; }
-    .spine-toggle svg { transition: transform 0.3s ease; }
+    .spine-toggle:hover { background: var(--bg-bubble); border-color: var(--text-faint); }
+    .spine.open .spine-toggle { align-self: flex-start; margin: 8px 0 0 16px; }
+    .spine-toggle svg { transition: transform 0.25s ease; }
     .spine.open .spine-toggle svg { transform: rotate(180deg); }
 
     .spine-foot {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 9px;
-      color: rgba(244,247,244,0.5);
-      letter-spacing: 0.05em;
+      font-size: 10.5px;
+      color: var(--text-faint);
       display: none;
+      padding: 12px 16px 4px;
     }
-    .spine.open .spine-foot { display: block; padding: 14px 22px 0; }
+    .spine.open .spine-foot { display: block; }
     .spine-dot {
       width: 5px; height: 5px;
       border-radius: 50%;
-      background: var(--gold);
+      background: #7a9b6e;
       display: inline-block;
       margin-right: 6px;
-      box-shadow: 0 0 5px var(--gold);
-      animation: pulse 2.2s infinite;
     }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity: 0.35; } }
 
     /* ── Main ── */
     .main {
@@ -148,39 +139,39 @@
     }
 
     .topbar {
-      height: 58px;
+      height: 54px;
       display: flex;
-      align-items: baseline;
-      padding: 0 32px;
+      align-items: center;
+      padding: 0 28px;
       gap: 14px;
       flex-shrink: 0;
-      border-bottom: 1px solid var(--rule);
+      border-bottom: 1px solid var(--border);
     }
     .topbar-title {
-      font-family: 'Fraunces', serif;
-      font-style: italic;
-      font-weight: 500;
-      font-size: 1.05rem;
-      color: var(--green);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
       flex: 1;
     }
     .model-chip {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 10.5px;
-      color: var(--ink-faint);
-      letter-spacing: 0.03em;
+      color: var(--text-faint);
+      background: var(--bg-panel);
+      padding: 3px 9px;
+      border-radius: 20px;
     }
     .timing-chip {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 10.5px;
-      color: var(--gold);
+      color: var(--text-soft);
     }
 
     /* ── Chat area ── */
     .chat-area {
       flex: 1;
       overflow-y: auto;
-      padding: 40px 24px 24px;
+      padding: 32px 24px 24px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -188,129 +179,119 @@
     }
     .chat-inner {
       width: 100%;
-      max-width: 640px;
+      max-width: 700px;
       display: flex;
       flex-direction: column;
       gap: 0;
     }
 
-    /* ── Welcome (handbook cover) ── */
+    /* ── Welcome ── */
     .welcome {
-      padding: 8px 4px 34px;
-      animation: fadeUp 0.5s ease;
-      border-bottom: 2px solid var(--green);
-      margin-bottom: 30px;
+      padding: 24px 4px 30px;
+      animation: fadeUp 0.4s ease;
     }
-    .welcome-eyebrow {
+    .welcome-avatar {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--accent-dark);
+      color: var(--white);
+      display: flex; align-items: center; justify-content: center;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 14px;
+      font-size: 16px;
+      margin-bottom: 16px;
     }
     .welcome h1 {
-      font-family: 'Fraunces', serif;
-      font-style: italic;
+      font-size: 1.5rem;
       font-weight: 600;
-      font-size: 2.05rem;
-      color: var(--green);
-      margin-bottom: 12px;
-      line-height: 1.15;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.25;
     }
     .welcome p {
-      font-size: 13.5px;
-      color: var(--ink-soft);
-      line-height: 1.65;
-      max-width: 460px;
-      margin-bottom: 24px;
-    }
-    .index-label {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 9.5px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--ink-faint);
-      margin-bottom: 8px;
+      font-size: 14px;
+      color: var(--text-soft);
+      line-height: 1.6;
+      max-width: 480px;
+      margin-bottom: 22px;
     }
     .suggestions {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
     .suggestion-chip {
-      background: none;
-      border: none;
-      border-top: 1px solid var(--rule);
-      color: var(--ink);
-      padding: 12px 2px;
-      font-size: 13.5px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      padding: 13px 14px;
+      font-size: 13px;
       font-family: 'Inter', sans-serif;
       cursor: pointer;
       text-align: left;
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      transition: color 0.15s, padding-left 0.15s;
-      width: 100%;
+      line-height: 1.45;
+      transition: border-color 0.15s, background 0.15s;
     }
+    .suggestion-chip:hover { border-color: var(--text-faint); background: var(--bg-bubble); }
     .suggestion-chip .clause {
+      display: block;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--gold);
-      flex-shrink: 0;
+      font-size: 10.5px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
     }
-    .suggestion-chip .qcopy { flex: 1; }
-    .suggestion-chip:last-child { border-bottom: 1px solid var(--rule); }
-    .suggestion-chip:hover { color: var(--green); padding-left: 6px; }
-    .suggestion-chip:hover .clause { color: var(--green); }
 
     @keyframes fadeUp {
-      from { opacity:0; transform: translateY(10px); }
+      from { opacity:0; transform: translateY(8px); }
       to   { opacity:1; transform: translateY(0); }
     }
 
     /* ── Messages ── */
     .message-group {
-      margin-bottom: 24px;
-      animation: fadeUp 0.3s ease;
-    }
-
-    .msg.user {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12.5px;
-      color: var(--ink-soft);
+      margin-bottom: 22px;
+      animation: fadeUp 0.25s ease;
       display: flex;
-      gap: 10px;
-      padding-bottom: 10px;
+      flex-direction: column;
     }
-    .msg.user .qmark { color: var(--gold); flex-shrink: 0; }
-    .msg.user .qtext { color: var(--ink); font-family: 'Inter', sans-serif; font-size: 14px; }
 
-    /* Marginalia treatment: a green rule + gold pin, like an annotation
-       stamped in the margin of a bound handbook. */
-    .msg.bot {
-      font-family: 'Fraunces', serif;
-      font-weight: 500;
-      font-size: 16px;
-      line-height: 1.7;
-      color: var(--ink);
-      white-space: pre-wrap;
-      padding: 4px 0 4px 18px;
-      border-left: 2px solid var(--green);
-      position: relative;
+    /* User: right-aligned bubble, ChatGPT-style */
+    .msg.user {
+      align-self: flex-end;
+      max-width: 78%;
+      background: var(--bg-bubble);
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.55;
+      padding: 10px 15px;
+      border-radius: 16px 16px 4px 16px;
     }
-    .msg.bot::before {
-      content: '';
-      position: absolute;
-      left: -4px;
-      top: 6px;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--gold);
+
+    /* Assistant: no bubble, left-aligned with small avatar, Claude-style */
+    .msg.bot-row { display: flex; align-items: flex-start; gap: 10px; align-self: stretch; }
+    .bot-avatar {
+      width: 24px; height: 24px;
+      border-radius: 7px;
+      background: var(--accent-dark);
+      color: var(--white);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10.5px;
+      margin-top: 2px;
+    }
+    .msg.bot {
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+      flex: 1;
+      min-width: 0;
     }
     .msg.bot sup {
       font-family: 'IBM Plex Mono', monospace;
-      color: var(--green);
+      color: var(--text-soft);
       font-size: 11px;
       margin-left: 1px;
     }
@@ -318,35 +299,32 @@
     /* Footnote row under bot messages */
     .source-row {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
-      padding: 9px 0 4px 18px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 0 0 34px;
       margin-top: 2px;
     }
     .source-mark {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--green);
+      font-size: 10.5px;
+      color: var(--text-faint);
       flex-shrink: 0;
     }
     .source-chip {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10.5px;
-      color: var(--ink-soft);
+      font-size: 11.5px;
+      color: var(--text-soft);
+      background: var(--bg-panel);
+      padding: 3px 9px;
+      border-radius: 20px;
     }
-    .source-chip b {
-      color: var(--gold);
-      font-weight: 500;
-    }
-    /* off-topic: stamped like a rejection mark on a returned form */
+    .source-chip b { font-weight: 600; color: var(--text); }
     .source-chip.sql {
-      display: inline-block;
-      border: 1px solid var(--ink-faint);
-      color: var(--ink-soft);
-      padding: 2px 8px;
-      letter-spacing: 0.06em;
+      color: var(--text-soft);
+      background: var(--bg-bubble);
       text-transform: uppercase;
-      font-size: 9.5px;
+      letter-spacing: 0.04em;
+      font-size: 10px;
     }
 
     /* Typing */
@@ -354,12 +332,12 @@
       display: flex;
       gap: 5px;
       align-items: center;
-      padding: 10px 0 10px 18px;
-      animation: fadeUp 0.3s ease;
+      padding: 8px 0 8px 34px;
+      animation: fadeUp 0.25s ease;
     }
     .typing-row span {
-      width: 5px; height: 5px;
-      background: var(--ink-faint);
+      width: 6px; height: 6px;
+      background: var(--text-faint);
       border-radius: 50%;
       animation: bounce 1.3s infinite ease-in-out;
     }
@@ -372,95 +350,98 @@
 
     /* ── Input bar ── */
     .input-bar {
-      padding: 16px 24px 26px;
+      padding: 12px 24px 22px;
       display: flex;
       justify-content: center;
       flex-shrink: 0;
     }
     .input-wrap {
       width: 100%;
-      max-width: 640px;
+      max-width: 700px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       background: var(--white);
-      border: 1px solid var(--rule);
-      border-radius: 3px;
-      padding: 10px 14px;
-      transition: border-color 0.2s;
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 10px 10px 10px 18px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .input-wrap:focus-within { border-color: var(--green); }
+    .input-wrap:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(140,160,201,0.15); }
     .input-wrap input {
       flex: 1;
       border: none;
       outline: none;
       font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      color: var(--ink);
+      font-size: 14.5px;
+      color: var(--text);
       background: transparent;
       padding: 4px 0;
     }
-    .input-wrap input::placeholder { color: var(--ink-faint); }
-    .input-wrap input:disabled { color: var(--ink-faint); }
+    .input-wrap input::placeholder { color: var(--text-faint); }
+    .input-wrap input:disabled { color: var(--text-faint); }
     .send-btn {
-      width: 30px; height: 30px;
-      border-radius: 3px;
+      width: 34px; height: 34px;
+      border-radius: 50%;
       border: none;
-      background: var(--green);
+      background: var(--accent-dark);
       color: var(--white);
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.2s;
+      transition: background 0.15s;
       flex-shrink: 0;
     }
-    .send-btn:hover { background: var(--green-deep); }
-    .send-btn:disabled { background: var(--rule); color: var(--ink-faint); cursor: not-allowed; }
+    .send-btn:hover { background: #3a3936; }
+    .send-btn:disabled { background: var(--border); color: var(--text-faint); cursor: not-allowed; }
 
     .footer-note {
       text-align: center;
-      font-size: 10.5px;
-      color: var(--ink-faint);
+      font-size: 11px;
+      color: var(--text-faint);
       margin-top: 10px;
-      max-width: 640px;
+      max-width: 700px;
       margin-left: auto;
       margin-right: auto;
     }
 
     button:focus-visible, input:focus-visible, .suggestion-chip:focus-visible {
-      outline: 2px solid var(--green);
+      outline: 2px solid var(--focus);
       outline-offset: 2px;
     }
 
     /* ── Scrollbar ── */
     .chat-area::-webkit-scrollbar { width: 5px; }
     .chat-area::-webkit-scrollbar-track { background: transparent; }
-    .chat-area::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
     /* ── Mobile ── */
     @media (max-width: 640px) {
-      .spine { width: 42px; }
-      .spine.open { width: 226px; }
-      .topbar { padding: 0 18px; }
-      .chat-area { padding: 28px 16px 16px; }
-      .welcome h1 { font-size: 1.6rem; }
+      .spine { width: 40px; }
+      .spine.open { width: 210px; }
+      .topbar { padding: 0 16px; }
+      .chat-area { padding: 22px 14px 14px; }
+      .welcome h1 { font-size: 1.25rem; }
+      .suggestions { grid-template-columns: 1fr; }
+      .msg.user { max-width: 88%; }
     }
   </style>
 </head>
 <body>
 
-<!-- ─── Spine ───────────────────────────────────────────────── -->
+<!-- ─── Sidebar ───────────────────────────────────────────────── -->
 <div class="spine" id="spine">
-  <div class="spine-mark">RAGML — Handbook Assistant</div>
+  <div class="spine-mark">R</div>
 
   <div class="spine-drawer">
-    <div class="drawer-card">
+    <div class="drawer-section">
       <div class="drawer-eyebrow">Domain guard</div>
       <div class="drawer-row"><span class="drawer-label">strategy</span><span class="drawer-value">TF-IDF cosine</span></div>
       <div class="drawer-row"><span class="drawer-label">threshold</span><span class="drawer-value">0.12</span></div>
       <div class="drawer-row"><span class="drawer-label">reference set</span><span class="drawer-value">24 pairs</span></div>
       <div class="drawer-row"><span class="drawer-label">categories</span><span class="drawer-value">9</span></div>
     </div>
-    <div class="drawer-card">
+    <div class="drawer-section">
       <div class="drawer-eyebrow">Generation</div>
       <div class="drawer-row"><span class="drawer-label">model</span><span class="drawer-value">gpt2</span></div>
       <div class="drawer-row"><span class="drawer-label">temperature</span><span class="drawer-value">0.7</span></div>
@@ -470,7 +451,7 @@
   </div>
 
   <button class="spine-toggle" id="spineToggle" onclick="toggleSpine()" aria-label="Toggle pipeline details">
-    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
       <path d="M9 18l6-6-6-6"/>
     </svg>
   </button>
@@ -490,32 +471,31 @@
     <div class="chat-inner" id="chatInner">
       <!-- Welcome -->
       <div class="welcome" id="welcome">
-        <div class="welcome-eyebrow">Ask the handbook</div>
+        <div class="welcome-avatar">R</div>
         <h1>What do you need to know?</h1>
-        <p>Answers are drawn strictly from the student handbook — the assistant declines anything outside its pages rather than guessing.</p>
-        <div class="index-label">Frequently cited clauses</div>
+        <p>Ask about attendance, grading, enrollment, discipline, scholarships, or student organizations — answers are drawn strictly from the student handbook.</p>
         <div class="suggestions">
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Attendance</span><span class="qcopy">How many absences before I fail a class?</span></button>
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Grading</span><span class="qcopy">What is the grading scale?</span></button>
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Honors</span><span class="qcopy">GPA needed for the Dean's Honors List?</span></button>
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Enrollment</span><span class="qcopy">How many times can I shift programs?</span></button>
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Grievance</span><span class="qcopy">How do I file a grievance against a faculty member?</span></button>
-          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">§ Wellbeing</span><span class="qcopy">Does the school have a mental health policy?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Attendance</span><span class="qcopy">How many absences before I fail a class?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Grading</span><span class="qcopy">What is the grading scale?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Honors</span><span class="qcopy">GPA needed for the Dean's Honors List?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Enrollment</span><span class="qcopy">How many times can I shift programs?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Grievance</span><span class="qcopy">How do I file a grievance against a faculty member?</span></button>
+          <button class="suggestion-chip" onclick="ask(this)"><span class="clause">Wellbeing</span><span class="qcopy">Does the school have a mental health policy?</span></button>
         </div>
       </div>
     </div>
   </div>
 
   <div class="input-bar">
-    <div style="width:100%; max-width:640px; display:flex; flex-direction:column;">
+    <div style="width:100%; max-width:700px; display:flex; flex-direction:column;">
       <div class="input-wrap">
         <input type="text" id="userInput"
                placeholder="Ask about attendance, grading, enrollment, discipline…"
                autocomplete="off" />
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send">
-          <svg width="14" height="14" fill="none" stroke="currentColor"
+          <svg width="15" height="15" fill="none" stroke="currentColor"
                stroke-width="2.4" viewBox="0 0 24 24">
-            <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
+            <path d="M12 19V5M5 12l7-7 7 7"/>
           </svg>
         </button>
       </div>
@@ -561,7 +541,7 @@
   function appendUser(text) {
     const g = document.createElement("div");
     g.className = "message-group";
-    g.innerHTML = `<div class="msg user"><span class="qmark">Q/</span><span class="qtext">${escHtml(text)}</span></div>`;
+    g.innerHTML = `<div class="msg user">${escHtml(text)}</div>`;
     chatInner.appendChild(g);
     scrollBottom();
   }
@@ -595,7 +575,7 @@
 
     const g = document.createElement("div");
     g.className = "message-group";
-    g.innerHTML = `<div class="msg bot">${html}</div>`;
+    g.innerHTML = `<div class="msg bot-row"><div class="bot-avatar">R</div><div class="msg bot">${html}</div></div>`;
 
     // Footnote row
     if (sources && sources.length > 0) {

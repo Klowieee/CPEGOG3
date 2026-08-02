@@ -6,3 +6,6 @@ scikit-learn>=1.4.0
 accelerate>=0.29.0
 sacrebleu>=2.4.0
 gradio>=4.0.0
+flask>=3.0.0
+sentence-transformers>=2.7.0
+numpy>=1.26.0
