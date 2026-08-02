@@ -12,6 +12,7 @@ dependencies = [
     "pyyaml>=6.0",               # settings.yaml
     "rich>=13.0",                # Terminal rendering
     "rank-bm25>=0.2.2",
+    "flask>=3.0",                # web/api.py — browser frontend on top of the same ChatEngine
 ]
 
 # uv installs this group by default on `uv sync` (exclude with --no-dev).

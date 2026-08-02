@@ -8,6 +8,7 @@ rich>=13.0              # Terminal rendering
 rank-bm25>=0.2.2        # Keyword channel for hybrid retrieval (off by default,
                         # but src/retrieval/retriever.py imports it at module
                         # level, so the app will not start without it)
+flask>=3.0              # web/api.py — browser frontend on top of the same ChatEngine
 
 # Development
 pytest>=8.0

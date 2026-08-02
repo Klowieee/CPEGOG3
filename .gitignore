@@ -15,3 +15,4 @@ data/plans/*
 !data/checklists/.gitkeep
 !data/plans/.gitkeep
 .pytest_cache/
+.env.example
