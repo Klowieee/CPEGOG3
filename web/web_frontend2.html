@@ -289,6 +289,10 @@
       flex: 1;
       min-width: 0;
     }
+    .msg.bot.refused {
+      color: var(--text-soft);
+      font-style: italic;
+    }
     .msg.bot sup {
       font-family: 'IBM Plex Mono', monospace;
       color: var(--text-soft);
@@ -325,6 +329,10 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
       font-size: 10px;
+    }
+    .source-chip.unverified {
+      color: #7A4A00;
+      background: #FBEBD0;
     }
 
     /* Typing */
@@ -433,20 +441,9 @@
 <div class="spine" id="spine">
   <div class="spine-mark">R</div>
 
-  <div class="spine-drawer">
+  <div class="spine-drawer" id="spineDrawer">
     <div class="drawer-section">
-      <div class="drawer-eyebrow">Domain guard</div>
-      <div class="drawer-row"><span class="drawer-label">strategy</span><span class="drawer-value">TF-IDF cosine</span></div>
-      <div class="drawer-row"><span class="drawer-label">threshold</span><span class="drawer-value">0.12</span></div>
-      <div class="drawer-row"><span class="drawer-label">reference set</span><span class="drawer-value">24 pairs</span></div>
-      <div class="drawer-row"><span class="drawer-label">categories</span><span class="drawer-value">9</span></div>
-    </div>
-    <div class="drawer-section">
-      <div class="drawer-eyebrow">Generation</div>
-      <div class="drawer-row"><span class="drawer-label">model</span><span class="drawer-value">gpt2</span></div>
-      <div class="drawer-row"><span class="drawer-label">temperature</span><span class="drawer-value">0.7</span></div>
-      <div class="drawer-row"><span class="drawer-label">max_new_tokens</span><span class="drawer-value">80</span></div>
-      <div class="drawer-row"><span class="drawer-label">top_p</span><span class="drawer-value">0.9</span></div>
+      <div class="drawer-eyebrow">Loading pipeline info…</div>
     </div>
   </div>
 
@@ -463,7 +460,7 @@
 <div class="main">
   <div class="topbar">
     <div class="topbar-title">Student Handbook Assistant</div>
-    <span class="model-chip" id="modelChip">gpt2 · guard 0.12</span>
+    <span class="model-chip" id="modelChip">loading…</span>
     <span class="timing-chip" id="timingChip" style="display:none"></span>
   </div>
 
@@ -500,7 +497,7 @@
         </button>
       </div>
       <div class="footer-note">
-        Answers come from a small fine-tuned model constrained by a handbook domain guard — it can miss nuance. Always verify with your official adviser.
+        Answers are grounded in retrieved handbook excerpts and cite the sections they came from — it refuses rather than guessing when the handbook doesn't cover something. Always verify with your official adviser.
       </div>
     </div>
   </div>
@@ -565,27 +562,40 @@
     return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
-  function appendBot(text, citations, sources, elapsed) {
-    // Format [Source: X] inline as small superscript markers
-    let citeCount = 0;
-    let html = escHtml(text).replace(
-      /\[Source:\s*([^\]]+)\]/g,
-      (_, id) => { citeCount++; return `<sup title="${escHtml(id)}">[${citeCount}]</sup>`; }
-    );
+  function appendBot(text, citations, sources, elapsed, refused) {
+    // The backend's model writes its own [1], [2] markers inline — resolve
+    // each against the citations list (by marker number, not array position,
+    // since only some retrieved chunks may end up cited) rather than
+    // inventing our own numbering.
+    const byMarker = {};
+    (citations || []).forEach(c => { byMarker[c.marker] = c.citation; });
+
+    let html = escHtml(text).replace(/\[(\d+)\]/g, (whole, numStr) => {
+      const n = parseInt(numStr, 10);
+      const cite = byMarker[n];
+      return cite ? `<sup title="${escHtml(cite)}">[${n}]</sup>` : whole;
+    });
 
     const g = document.createElement("div");
     g.className = "message-group";
-    g.innerHTML = `<div class="msg bot-row"><div class="bot-avatar">R</div><div class="msg bot">${html}</div></div>`;
+    g.innerHTML = refused
+      ? `<div class="msg bot-row"><div class="bot-avatar">R</div><div class="msg bot refused">${html}</div></div>`
+      : `<div class="msg bot-row"><div class="bot-avatar">R</div><div class="msg bot">${html}</div></div>`;
 
-    // Footnote row
+    // Footnote row: distinguishes a normal cited source, an "unverified"
+    // one (the model answered but didn't attribute it, so this is only the
+    // retrieved excerpt, not a confirmed citation), and the off-topic case.
     if (sources && sources.length > 0) {
       const sr = document.createElement("div");
       sr.className = "source-row";
-      const marks = sources.map((s, i) => {
-        if (s.type === 'sql') {
-          return `<span class="source-chip sql" title="${escHtml(s.preview || '')}">${escHtml(s.label || 'out of scope')}</span>`;
+      const marks = sources.map((s) => {
+        if (s.type === "sql") {
+          return `<span class="source-chip sql">${escHtml(s.label || "not covered")}</span>`;
         }
-        return `<span class="source-mark">${i + 1}</span><span class="source-chip" title="${escHtml(s.preview || '')}">matched <b>${escHtml(s.label || s.id)}</b></span>`;
+        if (s.type === "unverified") {
+          return `<span class="source-chip unverified" title="${escHtml(s.citation || "")}">\u26A0 ${escHtml(s.label)}: <b>${escHtml(s.citation || "")}</b></span>`;
+        }
+        return `<span class="source-chip" title="${escHtml(s.label || "")}">source: <b>${escHtml(s.label || "")}</b></span>`;
       }).join("");
       sr.innerHTML = marks;
       g.appendChild(sr);
@@ -594,7 +604,6 @@
     chatInner.appendChild(g);
     scrollBottom();
 
-    // Update timing chip
     if (elapsed) {
       timingEl.style.display = "inline-block";
       timingEl.textContent = `${elapsed}s`;
@@ -620,13 +629,13 @@
       const data = await res.json();
       removeTyping();
       if (data.response) {
-        appendBot(data.response, data.citations, data.sources, data.elapsed);
+        appendBot(data.response, data.citations, data.sources, data.elapsed, data.refused);
       } else {
-        appendBot("Sorry, something went wrong. Please try again.", [], [], null);
+        appendBot("Sorry, something went wrong. Please try again.", [], [], null, false);
       }
     } catch {
       removeTyping();
-      appendBot("Could not reach the server. Make sure api.py is running.", [], [], null);
+      appendBot("Could not reach the server. Make sure web/api.py is running.", [], [], null, false);
     }
 
     setLoading(false);
@@ -637,6 +646,41 @@
     userInput.value = chip.querySelector(".qcopy").textContent;
     sendMessage();
   }
+
+  // Populate the top bar + drawer from the real settings.yaml values,
+  // rather than hardcoding a model/threshold the backend might not match.
+  async function loadConfig() {
+    try {
+      const res = await fetch("/config");
+      const cfg = await res.json();
+      if (cfg.error) {
+        document.getElementById("modelChip").textContent = "setup required";
+        document.getElementById("spineDrawer").innerHTML =
+          `<div class="drawer-section"><div class="drawer-eyebrow">Setup needed</div>` +
+          `<div class="drawer-row"><span class="drawer-label">${escHtml(cfg.error)}</span></div></div>`;
+        return;
+      }
+      document.getElementById("modelChip").textContent =
+        `${cfg.llm_model} \u00b7 floor ${cfg.similarity_floor}`;
+      document.getElementById("spineDrawer").innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-eyebrow">Retrieval</div>
+          <div class="drawer-row"><span class="drawer-label">embedding model</span><span class="drawer-value">${escHtml(cfg.embedding_model)}</span></div>
+          <div class="drawer-row"><span class="drawer-label">top_k</span><span class="drawer-value">${cfg.top_k}</span></div>
+          <div class="drawer-row"><span class="drawer-label">similarity floor</span><span class="drawer-value">${cfg.similarity_floor}</span></div>
+          <div class="drawer-row"><span class="drawer-label">hybrid BM25</span><span class="drawer-value">${cfg.hybrid_enabled ? "on" : "off"}</span></div>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-eyebrow">Generation</div>
+          <div class="drawer-row"><span class="drawer-label">provider</span><span class="drawer-value">${escHtml(cfg.llm_provider)}</span></div>
+          <div class="drawer-row"><span class="drawer-label">model</span><span class="drawer-value">${escHtml(cfg.llm_model)}</span></div>
+          <div class="drawer-row"><span class="drawer-label">query rewrite</span><span class="drawer-value">${cfg.rewrite_enabled ? "on" : "off"}</span></div>
+        </div>`;
+    } catch {
+      document.getElementById("modelChip").textContent = "offline";
+    }
+  }
+  loadConfig();
 
   userInput.addEventListener("keypress", e => { if (e.key === "Enter") sendMessage(); });
 </script>
