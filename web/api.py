@@ -41,6 +41,14 @@ def index():
     return send_from_directory(WEB_DIR, "frontend2.html")
 
 
+@app.route("/<path:filename>")
+def serve_asset(filename):
+    # static_folder=None disables Flask's default static handling above —
+    # this catches everything else the page references by relative path
+    # (logo.gif, future icons, etc.) so they don't silently 404.
+    return send_from_directory(WEB_DIR, filename)
+
+
 @app.route("/config")
 def config_info():
     """Real pipeline settings for the frontend's info drawer — read from
